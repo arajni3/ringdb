@@ -1561,7 +1561,7 @@ class LSMTree {
     MemTable* memtables;
     struct io_uring* main_thread_comm_ring;
 
-    std::atomic_uint_fast8_t num_read{0};
+    std::atomic_uint num_read{0};
 
     char* sstable_page_cache_buffers; 
 };
