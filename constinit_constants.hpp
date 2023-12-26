@@ -1,9 +1,6 @@
 #pragma once
-#include <cmath>
 #include <numeric>
-#include <cstdint>
 #include <fcntl.h>
-
 
 /* compile time-evaluated ceil of log base 2 function in place of standard log2 function, which, 
 along with the other log functions from cmath, will not be constexpr until C++26
