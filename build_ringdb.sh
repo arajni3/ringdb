@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # first build liburing
 chmod +x build_liburing.sh
 ./build_liburing.sh
