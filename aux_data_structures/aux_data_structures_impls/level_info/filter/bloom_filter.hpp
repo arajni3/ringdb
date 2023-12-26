@@ -22,16 +22,9 @@ extern "C" {
 #include <inttypes.h>       /* PRIu64 */
 #include <cstddef>
 #include <numeric>
-#include <cstdio>
-#include <stdlib.h>
 #include <math.h>           /* pow, exp */
-#include <stdio.h>          /* printf */
 #include <string.h>         /* strlen */
-#include <fcntl.h>          /* O_RDWR */
 #include <sys/mman.h>       /* mmap, mummap */
-#include <sys/types.h>      /* */
-#include <sys/stat.h>       /* fstat */
-#include <unistd.h>         /* close */
 
 /* https://gcc.gnu.org/onlinedocs/gcc/Alternate-Keywords.html#Alternate-Keywords */
 #ifndef __GNUC__
