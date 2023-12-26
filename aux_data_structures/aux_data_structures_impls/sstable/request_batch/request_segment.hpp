@@ -18,6 +18,8 @@ class RequestSegment {
     void insert_memtable(char* memtable_data) {
         unsigned int current, left, right, left_child, right_child, tree_base;
         int back = 0;
+
+        // we will need only (the first) three entries of the stack here, not all 4
         stack.push_top(MEMTABLE_SIZE >> 1, 0, MEMTABLE_SIZE, 0);
         data = new char[MEMTABLE_SIZE];
         std::memcpy(data, memtable_data + (MEMTABLE_SIZE >> 1), KEY_LENGTH + VALUE_LENGTH);
