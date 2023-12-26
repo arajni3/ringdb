@@ -314,8 +314,9 @@ class LSMTree {
                 */
                 this->move_down_to_children(sstable_info, null_key);
             } else {
-                sstable_info->desired_sstable_offset = sstable_info->stack.top()[0];
-                cur_request = sstable_info->stack.top()[1];
+                auto stack_top = sstable_info->stack.top();
+                sstable_info->desired_sstable_offset = stack_top[0];
+                cur_request = stack_top[1];
                 conn_req = sstable_info->req_batch->content.readwrite_pool.data + cur_request;
                 location = sstable_info->cache_helper.get_buffer_info(sstable_info->
                 desired_sstable_offset);
