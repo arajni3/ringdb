@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # first build liburing
+if [ ! -f liburing/src/include/liburing.h ]; then
 chmod +x build_liburing.sh
 ./build_liburing.sh
 
