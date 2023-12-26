@@ -21,6 +21,7 @@ extern "C" {
 
 #include <inttypes.h>       /* PRIu64 */
 #include <cstddef>
+#include <numeric>
 #include <cstdio>
 #include <stdlib.h>
 #include <math.h>           /* pow, exp */
@@ -88,9 +89,6 @@ static __inline__ int bloom_filter_import_hex_string(BloomFilter *bf, char *hex)
 
 /* Set or change the hashing function */
 void bloom_filter_set_hash_function(BloomFilter *bf, BloomHashFunction hash_function);
-
-/* Print out statistics about the bloom filter */
-void bloom_filter_stats(BloomFilter *bf);
 
 /* Release all memory used by the bloom filter */
 int bloom_filter_destroy(BloomFilter *bf);
@@ -208,7 +206,9 @@ int bloom_filter_init_alt(BloomFilter *bf, uint64_t estimated_elements, float fa
     bf->estimated_elements = estimated_elements;
     bf->false_positive_probability = false_positive_rate;
     __calculate_optimal_hashes(bf);
-    bf->bloom = (unsigned char*)calloc(bf->bloom_length + 1, sizeof(char)); // pad to ensure no running off the end
+    // additionally pad to avoid false sharing
+    bf->bloom = (unsigned char*)calloc(
+        std::lcm(bf->bloom_length + 1, ALIGN_NO_FALSE_SHARING), sizeof(char)); // pad to ensure no running off the end
     mlock(bf->bloom, sizeof(char) * (bf->bloom_length + 1));
 
     bf->elements_added = 0;

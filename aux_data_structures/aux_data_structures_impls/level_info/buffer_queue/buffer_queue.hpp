@@ -1,8 +1,19 @@
 #pragma once
 #include <atomic>
+#include <numeric>
+
+template<unsigned int length>
+consteval unsigned int align() {
+    unsigned int res = std::lcm(length, ALIGN_NO_FALSE_SHARING), power = 1, exponent = 0;
+    while (power < res) {
+        power <<= 1;
+        ++exponent;
+    }
+    return power;
+}
 
 template<unsigned int length, unsigned int start_num_buffers>
-struct alignas(ALIGN_NO_FALSE_SHARING) BufferQueue {
+struct alignas(align<length>()) BufferQueue {
     private:
     unsigned int queue_front = 0, back = 0;
 
