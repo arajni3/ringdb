@@ -100,7 +100,7 @@ MemTableLike MemTable,
 
 LevelInfoLike LevelInfo,
 BufferQueueLike BufferQueue,
-FilterLike BloomFilter,
+FilterLike Filter,
 SparseIndexLike SparseIndex,
 DecompositionLike Decomposition,
 
