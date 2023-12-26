@@ -69,17 +69,6 @@ int bloom_filter_init_alt(BloomFilter *bf, uint64_t estimated_elements, float fa
 static __inline__ int bloom_filter_init(BloomFilter *bf, uint64_t estimated_elements, float false_positive_rate) {
     return bloom_filter_init_alt(bf, estimated_elements, false_positive_rate, NULL);
 }
-
-/*  Export and import as a hex string; not space effecient but allows for storing
-    multiple blooms in a single file or in a database, etc.
-
-    NOTE: It is up to the caller to free the allocated memory */
-char* bloom_filter_export_hex_string(BloomFilter *bf);
-int bloom_filter_import_hex_string_alt(BloomFilter *bf, const char *hex, BloomHashFunction hash_function);
-static __inline__ int bloom_filter_import_hex_string(BloomFilter *bf, char *hex) {
-    return bloom_filter_import_hex_string_alt(bf, hex, NULL);
-}
-
 /* Set or change the hashing function */
 void bloom_filter_set_hash_function(BloomFilter *bf, BloomHashFunction hash_function);
 
@@ -122,8 +111,6 @@ void bloom_filter_set_elements_to_estimated(BloomFilter *bf);
     NOTE: It is up to the caller to free the allocated memory */
 uint64_t* bloom_filter_calculate_hashes(BloomFilter *bf, const char *str, unsigned int number_hashes);
 
-/* Calculate the size the bloom filter will take on disk when exported in bytes */
-uint64_t bloom_filter_export_size(BloomFilter *bf);
 
 /*******************************************************************************
     Merging, Intersection, and Jaccard Index Functions
@@ -297,59 +284,6 @@ float bloom_filter_current_false_positive_rate(BloomFilter *bf) {
     return pow((1 - e), bf->number_hashes);
 }
 
-char* bloom_filter_export_hex_string(BloomFilter *bf) {
-    uint64_t i, bytes = sizeof(uint64_t) * 2 + sizeof(float) + (bf->bloom_length);
-    char* hex = (char*)calloc((bytes * 2 + 1), sizeof(char));
-    for (i = 0; i < bf->bloom_length; ++i) {
-        sprintf(hex + (i * 2), "%02x", bf->bloom[i]); // not the fastest way, but works
-    }
-    i = bf->bloom_length * 2;
-    sprintf(hex + i, "%016" PRIx64 "", bf->estimated_elements);
-    i += 16; // 8 bytes * 2 for hex
-    sprintf(hex + i, "%016" PRIx64 "", bf->elements_added);
-
-    unsigned int ui;
-    memcpy(&ui, &bf->false_positive_probability, sizeof (ui));
-    i += 16; // 8 bytes * 2 for hex
-    sprintf(hex + i, "%08x", ui);
-    return hex;
-}
-
-int bloom_filter_import_hex_string_alt(BloomFilter *bf, const char *hex, BloomHashFunction hash_function) {
-    uint64_t len = strlen(hex);
-    if (len % 2 != 0) {
-        fprintf(stderr, "Unable to parse; exiting\n");
-        return BLOOM_FAILURE;
-    }
-    char fpr[9] = {0};
-    char est_els[17] = {0};
-    char ins_els[17] = {0};
-    memcpy(fpr, hex + (len - 8), 8);
-    memcpy(ins_els, hex + (len - 24), 16);
-    memcpy(est_els, hex + (len - 40), 16);
-    uint32_t t_fpr;
-
-    bf->estimated_elements = strtoull(est_els, NULL, 16);
-    bf->elements_added = strtoull(ins_els, NULL, 16);
-    sscanf(fpr, "%x", &t_fpr);
-    float f;
-    memcpy(&f, &t_fpr, sizeof(float));
-    bf->false_positive_probability = f;
-    bloom_filter_set_hash_function(bf, hash_function);
-
-    __calculate_optimal_hashes(bf);
-    bf->bloom = (unsigned char*)calloc(bf->bloom_length + 1, sizeof(char));  // pad
-
-    uint64_t i;
-    for (i = 0; i < bf->bloom_length; ++i) {
-        sscanf(hex + (i * 2), "%2hx", (short unsigned int*)&bf->bloom[i]);
-    }
-    return BLOOM_SUCCESS;
-}
-
-uint64_t bloom_filter_export_size(BloomFilter *bf) {
-    return (uint64_t)(bf->bloom_length * sizeof(unsigned char)) + (2 * sizeof(uint64_t)) + sizeof(float);
-}
 
 uint64_t bloom_filter_count_set_bits(BloomFilter *bf) {
     uint64_t i, res = 0;
