@@ -233,7 +233,7 @@ class LSMTree {
     */
     inline size_t round_to_block_size_multiple(size_t i) {
         return i - (i & ((1UL << 63) - 
-        (1UL << (static_cast<unsigned int>(std::log2(BLOCK_SIZE)) - 1))));
+        (1UL << (my_log2_floor<static_cast<double>(BLOCK_SIZE)>() - 1))));
     }
 
     inline void schedule_initialization_read(SSTableInfo* sstable_info, 

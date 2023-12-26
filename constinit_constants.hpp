@@ -15,6 +15,12 @@ consteval unsigned int my_log2_ceil() {
     return exponent;
 }
 
+template<double doub>
+consteval unsigned int my_log2_floor() {
+    unsigned int exponent = my_log2_ceil<doub>();
+    return exponent - ((1 << exponent) > doub);
+}
+
 
 #define NUM_SSTABLES (TOTAL_SSTABLE_STORAGE_SPACE_MB / (1 << MEMTABLE_SIZE_MB_BITS))
 
