@@ -14,7 +14,7 @@ if (TEST_RINGDB)
 
     add_compile_definitions(PORT=8001)
 
-    add_compile_definitions(MEMTABLE_SIZE_MB_BITS=5)
+    add_compile_definitions(MEMTABLE_SIZE_MB_BITS=1)
 
     add_compile_definitions(TOTAL_SSTABLE_STORAGE_SPACE_MB=1000)
 
@@ -43,7 +43,7 @@ else()
     add_compile_definitions(PORT=8001)
 
     # provide the number of bits of the memtable size, which should be a power of 2
-    add_compile_definitions(MEMTABLE_SIZE_MB_BITS=5)
+    add_compile_definitions(MEMTABLE_SIZE_MB_BITS=1)
 
     # must provide value in terms of megabytes
     add_compile_definitions(TOTAL_SSTABLE_STORAGE_SPACE_MB=1000)
@@ -107,6 +107,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/liburing/src/include)
+include_directories(${CMAKE_SOURCE_DIR}/gcem/include)
 
 add_executable(RingDB main.cpp)
 target_link_libraries(RingDB Threads::Threads)

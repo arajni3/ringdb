@@ -15,16 +15,15 @@
 ***
 *******************************************************************************/
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <inttypes.h>       /* PRIu64 */
 #include <cstddef>
+#include <cstdio>
 #include <numeric>
-#include <math.h>           /* pow, exp */
-#include <string.h>         /* strlen */
+#include <cmath>           /* pow, exp */
+#include <cstring>         /* strlen */
 #include <sys/mman.h>       /* mmap, mummap */
+
+#include <gcem.hpp>
 
 /* https://gcc.gnu.org/onlinedocs/gcc/Alternate-Keywords.html#Alternate-Keywords */
 #ifndef __GNUC__
@@ -45,71 +44,120 @@ extern "C" {
 
 #define bloom_filter_get_version()    (BLOOMFILTER_VERSION)
 
+#define CHECK_BIT_CHAR(c, k)  ((c) & (1 << (k)))
+#define CHECK_BIT(A, k)       (CHECK_BIT_CHAR(A[((k) / 8)], ((k) % 8)))
+// #define set_bit(A,k)          (A[((k) / 8)] |=  (1 << ((k) % 8)))
+// #define clear_bit(A,k)        (A[((k) / 8)] &= ~(1 << ((k) % 8)))
+
+/* define some constant magic looking numbers */
+#define CHAR_LEN KEY_LENGTH
+#define LOG_TWO_SQUARED  0.480453013918201388143813800   // 0.4804530143737792968750000
+                                                 
+                                                         // 0.4804530143737792968750000
+#define LOG_TWO 0.693147180559945286226764000
+
+/* https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable */
+#define B2(n) n,     n+1,     n+1,     n+2
+#define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
+#define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
+static const unsigned char bits_set_table[256] = {B6(0), B6(1), B6(1), B6(2)};
+
 typedef uint64_t* (*BloomHashFunction) (int num_hashes, const char *str);
 
-typedef struct bloom_filter {
-    /* bloom parameters */
-    uint64_t estimated_elements;
-    float false_positive_probability;
-    unsigned int number_hashes;
-    uint64_t number_bits;
-    /* bloom filter */
-    unsigned char *bloom;
-    unsigned long bloom_length;
-    uint64_t elements_added;
-    BloomHashFunction hash_function;
-} BloomFilter;
+consteval uint64_t compile_time_num_bits(uint64_t num_elems, double false_pos_prob) {
+    return gcem::ceil((static_cast<int64_t>(-num_elems) * gcem::log(false_pos_prob))
+    / LOG_TWO_SQUARED);
+}
 
+consteval unsigned int compile_time_num_hashes(uint64_t num_elems, double false_pos_prob) {
+    uint64_t m = compile_time_num_bits(num_elems, false_pos_prob);
+    unsigned int k = gcem::round(LOG_TWO * m / num_elems);
+    return k;
+}
+
+consteval unsigned long compile_time_bloom_length(uint64_t num_elems, double false_pos_prob) {
+    uint64_t m = compile_time_num_bits(num_elems, false_pos_prob);
+    return gcem::ceil(m / (CHAR_LEN * 1.0));
+}
+
+template<uint64_t num_elements, double false_pos_prob>
+struct BloomFilter {
+    uint64_t estimated_elements = num_elements;
+    double false_positive_probability = false_pos_prob;
+    unsigned int number_hashes = compile_time_num_hashes(num_elements, false_pos_prob);
+    uint64_t number_bits = compile_time_num_bits(num_elements, false_pos_prob);
+    /* bloom filter */
+    unsigned char bloom[
+        std::lcm(compile_time_bloom_length(num_elements, false_pos_prob), ALIGN_NO_FALSE_SHARING)
+    ];;
+    unsigned long bloom_length = std::lcm(
+        compile_time_bloom_length(num_elements, false_pos_prob), ALIGN_NO_FALSE_SHARING);
+    uint64_t elements_added = 0;
+
+    BloomHashFunction hash_function;
+    BloomFilter() {
+        bloom_filter_set_hash_function(this, nullptr);
+    }
+};
 
 /*  Initialize a standard bloom filter in memory; this will provide 'optimal' size and hash numbers.
 
     Estimated elements is 0 < x <= UINT64_MAX.
     False positive rate is 0.0 < x < 1.0 */
-int bloom_filter_init_alt(BloomFilter *bf, uint64_t estimated_elements, float false_positive_rate, BloomHashFunction hash_function);
-static __inline__ int bloom_filter_init(BloomFilter *bf, uint64_t estimated_elements, float false_positive_rate) {
-    return bloom_filter_init_alt(bf, estimated_elements, false_positive_rate, NULL);
-}
+
 /* Set or change the hashing function */
-void bloom_filter_set_hash_function(BloomFilter *bf, BloomHashFunction hash_function);
+template<uint64_t num_elements, double false_pos_prob>
+constexpr void bloom_filter_set_hash_function(BloomFilter<num_elements, false_pos_prob> *bf, BloomHashFunction hash_function);
 
 /* Release all memory used by the bloom filter */
-int bloom_filter_destroy(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_destroy(BloomFilter<num_elements, false_pos_prob> *bf);
 
 /* reset filter to unused state */
-int bloom_filter_clear(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_clear(BloomFilter<num_elements, false_pos_prob> *bf);
 
 /* Add a string (or element) to the bloom filter */
-int bloom_filter_add_string(BloomFilter *bf, const char *str);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_add_string(BloomFilter<num_elements, false_pos_prob> *bf, const char *str);
 
 /* Add a string to a bloom filter using the defined hashes */
-int bloom_filter_add_string_alt(BloomFilter *bf, uint64_t *hashes, unsigned int number_hashes_passed);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_add_string_alt(BloomFilter<num_elements, false_pos_prob> *bf, uint64_t *hashes, unsigned int number_hashes_passed);
 
 /* Check to see if a string (or element) is or is not in the bloom filter */
-int bloom_filter_check_string(BloomFilter *bf, const char *str);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_check_string(BloomFilter<num_elements, false_pos_prob> *bf, const char *str);
 
 /* Check if a string is in the bloom filter using the passed hashes */
-int bloom_filter_check_string_alt(BloomFilter *bf, uint64_t *hashes, unsigned int number_hashes_passed);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_check_string_alt(BloomFilter<num_elements, false_pos_prob> *bf, uint64_t *hashes, unsigned int number_hashes_passed);
 
 /* Calculates the current false positive rate based on the number of inserted elements */
-float bloom_filter_current_false_positive_rate(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+double bloom_filter_current_false_positive_rate(BloomFilter<num_elements, false_pos_prob> *bf);
 
 /* Count the number of bits set to 1 */
-uint64_t bloom_filter_count_set_bits(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_count_set_bits(BloomFilter<num_elements, false_pos_prob> *bf);
 
 /*  Estimate the number of unique elements in a Bloom Filter instead of using the overall count
     https://en.wikipedia.org/wiki/Bloom_filter#Approximating_the_number_of_items_in_a_Bloom_filter
     m = bits in Bloom filter
     k = number hashes
     X = count of flipped bits in filter */
-uint64_t bloom_filter_estimate_elements(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_estimate_elements(BloomFilter<num_elements, false_pos_prob> *bf);
 uint64_t bloom_filter_estimate_elements_by_values(uint64_t m, uint64_t X, int k);
 
 /* Wrapper to set the inserted elements count to the estimated elements calculation */
-void bloom_filter_set_elements_to_estimated(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+void bloom_filter_set_elements_to_estimated(BloomFilter<num_elements, false_pos_prob> *bf);
 
 /*  Generate the desired number of hashes for the provided string
     NOTE: It is up to the caller to free the allocated memory */
-uint64_t* bloom_filter_calculate_hashes(BloomFilter *bf, const char *str, unsigned int number_hashes);
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t* bloom_filter_calculate_hashes(BloomFilter<num_elements, false_pos_prob> *bf, const char *str, unsigned int number_hashes);
 
 
 /*******************************************************************************
@@ -119,24 +167,24 @@ uint64_t* bloom_filter_calculate_hashes(BloomFilter *bf, const char *str, unsign
 *******************************************************************************/
 
 /* Merge Bloom Filters - inserts information into res */
-int bloom_filter_union(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2);
-uint64_t bloom_filter_count_union_bits_set(BloomFilter *bf1, BloomFilter *bf2);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_union(BloomFilter<num_elements, false_pos_prob> *res, BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2);
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_count_union_bits_set(BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2);
 
 /*  Find the intersection of Bloom Filters - insert into res with the intersection
     The number of inserted elements is updated to the estimated elements calculation */
-int bloom_filter_intersect(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2);
-uint64_t bloom_filter_count_intersection_bits_set(BloomFilter *bf1, BloomFilter *bf2);
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_intersect(BloomFilter<num_elements, false_pos_prob> *res, BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2);
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_count_intersection_bits_set(BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2);
 
 /*  Calculate the Jacccard Index of the Bloom Filters
     NOTE: The closer to 1 the index, the closer in bloom filters. If it is 1, then
     the Bloom Filters contain the same elements, 0.5 would mean about 1/2 the same
     elements are in common. 0 would mean the Bloom Filters are completely different. */
-float bloom_filter_jaccard_index(BloomFilter *bf1, BloomFilter *bf2);
-
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+template<uint64_t num_elements, double false_pos_prob>
+double bloom_filter_jaccard_index(BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2);
 
 
 /*******************************************************************************
@@ -148,25 +196,7 @@ float bloom_filter_jaccard_index(BloomFilter *bf1, BloomFilter *bf2);
 ***
 ***     License: MIT 2015
 ***
-*******************************************************************************/
-
-
-#define CHECK_BIT_CHAR(c, k)  ((c) & (1 << (k)))
-#define CHECK_BIT(A, k)       (CHECK_BIT_CHAR(A[((k) / 8)], ((k) % 8)))
-// #define set_bit(A,k)          (A[((k) / 8)] |=  (1 << ((k) % 8)))
-// #define clear_bit(A,k)        (A[((k) / 8)] &= ~(1 << ((k) % 8)))
-
-/* define some constant magic looking numbers */
-#define CHAR_LEN KEY_LENGTH
-#define LOG_TWO_SQUARED  0.480453013918201388143813800   // 0.4804530143737792968750000
-                                                        // 0.4804530143737792968750000
-#define LOG_TWO 0.693147180559945286226764000
-
-/* https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetTable */
-#define B2(n) n,     n+1,     n+1,     n+2
-#define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
-#define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
-static const unsigned char bits_set_table[256] = {B6(0), B6(1), B6(1), B6(2)};
+*******************************************************************************
 
 
 /*******************************************************************************
@@ -174,44 +204,31 @@ static const unsigned char bits_set_table[256] = {B6(0), B6(1), B6(1), B6(2)};
 *******************************************************************************/
 static uint64_t* __default_hash(int num_hashes, const char *str);
 static uint64_t __fnv_1a(const char *key, int seed);
-static void __calculate_optimal_hashes(BloomFilter *bf);
+template<uint64_t num_elements, double false_pos_prob>
+static void __calculate_optimal_hashes(BloomFilter<num_elements, false_pos_prob> *bf);
 static int __sum_bits_set_char(unsigned char c);
-static int __check_if_union_or_intersection_ok(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2);
+template<uint64_t num_elements, double false_pos_prob>
+static int __check_if_union_or_intersection_ok(BloomFilter<num_elements, false_pos_prob> *res, BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2);
 
-
-int bloom_filter_init_alt(BloomFilter *bf, uint64_t estimated_elements, float false_positive_rate, BloomHashFunction hash_function) {
-    if(estimated_elements == 0 || estimated_elements > UINT64_MAX || false_positive_rate <= 0.0 || false_positive_rate >= 1.0) {
-        return BLOOM_FAILURE;
-    }
-    bf->estimated_elements = estimated_elements;
-    bf->false_positive_probability = false_positive_rate;
-    __calculate_optimal_hashes(bf);
-    // additionally pad to avoid false sharing
-    bf->bloom = (unsigned char*)calloc(
-        std::lcm(bf->bloom_length + 1, ALIGN_NO_FALSE_SHARING), sizeof(char)); // pad to ensure no running off the end
-    mlock(bf->bloom, sizeof(char) * (bf->bloom_length + 1));
-
-    bf->elements_added = 0;
-    bloom_filter_set_hash_function(bf, hash_function);
-    return BLOOM_SUCCESS;
+template<uint64_t num_elements, double false_pos_prob>
+constexpr void bloom_filter_set_hash_function(BloomFilter<num_elements, false_pos_prob> *bf, BloomHashFunction hash_function) {
+    bf->hash_function = (hash_function == nullptr) ? __default_hash : hash_function;
 }
 
-void bloom_filter_set_hash_function(BloomFilter *bf, BloomHashFunction hash_function) {
-    bf->hash_function = (hash_function == NULL) ? __default_hash : hash_function;
-}
-
-int bloom_filter_destroy(BloomFilter *bf) {
-    bf->bloom = NULL;
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_destroy(BloomFilter<num_elements, false_pos_prob> *bf) {
+    bf->bloom = nullptr;
     bf->elements_added = 0;
     bf->estimated_elements = 0;
     bf->false_positive_probability = 0;
     bf->number_hashes = 0;
     bf->number_bits = 0;
-    bf->hash_function = NULL;
+    bf->hash_function = nullptr;
     return BLOOM_SUCCESS;
 }
 
-int bloom_filter_clear(BloomFilter *bf) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_clear(BloomFilter<num_elements, false_pos_prob> *bf) {
     for (unsigned long i = 0; i < bf->bloom_length; ++i) {
         bf->bloom[i] = 0;
     }
@@ -219,29 +236,32 @@ int bloom_filter_clear(BloomFilter *bf) {
     return BLOOM_SUCCESS;
 }
 
-int bloom_filter_add_string(BloomFilter *bf, const char *str) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_add_string(BloomFilter<num_elements, false_pos_prob> *bf, const char *str) {
     uint64_t *hashes = bloom_filter_calculate_hashes(bf, str, bf->number_hashes);
     int res = bloom_filter_add_string_alt(bf, hashes, bf->number_hashes);
     free(hashes);
     return res;
 }
 
-
-int bloom_filter_check_string(BloomFilter *bf, const char *str) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_check_string(BloomFilter<num_elements, false_pos_prob> *bf, const char *str) {
     uint64_t *hashes = bloom_filter_calculate_hashes(bf, str, bf->number_hashes);
     int res = bloom_filter_check_string_alt(bf, hashes, bf->number_hashes);
     free(hashes);
     return res;
 }
 
-uint64_t* bloom_filter_calculate_hashes(BloomFilter *bf, const char *str, unsigned int number_hashes) {
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t* bloom_filter_calculate_hashes(BloomFilter<num_elements, false_pos_prob> *bf, const char *str, unsigned int number_hashes) {
     return bf->hash_function(number_hashes, str);
 }
 
 /* Add a string to a bloom filter using the defined hashes */
-int bloom_filter_add_string_alt(BloomFilter *bf, uint64_t *hashes, unsigned int number_hashes_passed) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_add_string_alt(BloomFilter<num_elements, false_pos_prob> *bf, uint64_t *hashes, unsigned int number_hashes_passed) {
     if (number_hashes_passed < bf->number_hashes) {
-        fprintf(stderr, "Error: not enough hashes passed in to correctly check!\n");
+        std::fprintf(stderr, "Error: not enough hashes passed in to correctly check!\n");
         return BLOOM_FAILURE;
     }
 
@@ -259,9 +279,10 @@ int bloom_filter_add_string_alt(BloomFilter *bf, uint64_t *hashes, unsigned int 
 }
 
 /* Check if a string is in the bloom filter using the passed hashes */
-int bloom_filter_check_string_alt(BloomFilter *bf, uint64_t *hashes, unsigned int number_hashes_passed) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_check_string_alt(BloomFilter<num_elements, false_pos_prob> *bf, uint64_t *hashes, unsigned int number_hashes_passed) {
     if (number_hashes_passed < bf->number_hashes) {
-        fprintf(stderr, "Error: not enough hashes passed in to correctly check!\n");
+        std::fprintf(stderr, "Error: not enough hashes passed in to correctly check!\n");
         return BLOOM_FAILURE;
     }
 
@@ -277,15 +298,16 @@ int bloom_filter_check_string_alt(BloomFilter *bf, uint64_t *hashes, unsigned in
     return r;
 }
 
-float bloom_filter_current_false_positive_rate(BloomFilter *bf) {
+template<uint64_t num_elements, double false_pos_prob>
+double bloom_filter_current_false_positive_rate(BloomFilter<num_elements, false_pos_prob> *bf) {
     int num = bf->number_hashes * bf->elements_added;
-    double d = -num / (float) bf->number_bits;
+    double d = -num / (double) bf->number_bits;
     double e = exp(d);
     return pow((1 - e), bf->number_hashes);
 }
 
-
-uint64_t bloom_filter_count_set_bits(BloomFilter *bf) {
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_count_set_bits(BloomFilter<num_elements, false_pos_prob> *bf) {
     uint64_t i, res = 0;
     for (i = 0; i < bf->bloom_length; ++i) {
         res += __sum_bits_set_char(bf->bloom[i]);
@@ -293,7 +315,8 @@ uint64_t bloom_filter_count_set_bits(BloomFilter *bf) {
     return res;
 }
 
-uint64_t bloom_filter_estimate_elements(BloomFilter *bf) {
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_estimate_elements(BloomFilter<num_elements, false_pos_prob> *bf) {
     return bloom_filter_estimate_elements_by_values(bf->number_bits, bloom_filter_count_set_bits(bf), bf->number_hashes);
 }
 
@@ -303,7 +326,8 @@ uint64_t bloom_filter_estimate_elements_by_values(uint64_t m, uint64_t X, int k)
     return (uint64_t)-(((double) m / k) * log_n);
 }
 
-int bloom_filter_union(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_union(BloomFilter<num_elements, false_pos_prob> *res, BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2) {
     // Ensure the bloom filters can be unioned
     if (__check_if_union_or_intersection_ok(res, bf1, bf2) == BLOOM_FAILURE) {
         return BLOOM_FAILURE;
@@ -316,7 +340,8 @@ int bloom_filter_union(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2) {
     return BLOOM_SUCCESS;
 }
 
-uint64_t bloom_filter_count_union_bits_set(BloomFilter *bf1, BloomFilter *bf2) {
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_count_union_bits_set(BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2) {
     // Ensure the bloom filters can be unioned
     if (__check_if_union_or_intersection_ok(bf1, bf1, bf2) == BLOOM_FAILURE) {  // use bf1 as res
         return BLOOM_FAILURE;
@@ -328,7 +353,8 @@ uint64_t bloom_filter_count_union_bits_set(BloomFilter *bf1, BloomFilter *bf2) {
     return res;
 }
 
-int bloom_filter_intersect(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2) {
+template<uint64_t num_elements, double false_pos_prob>
+int bloom_filter_intersect(BloomFilter<num_elements, false_pos_prob> *res, BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2) {
     // Ensure the bloom filters can be used in an intersection
     if (__check_if_union_or_intersection_ok(res, bf1, bf2) == BLOOM_FAILURE) {
         return BLOOM_FAILURE;
@@ -341,11 +367,13 @@ int bloom_filter_intersect(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2)
     return BLOOM_SUCCESS;
 }
 
-void bloom_filter_set_elements_to_estimated(BloomFilter *bf) {
+template<uint64_t num_elements, double false_pos_prob>
+void bloom_filter_set_elements_to_estimated(BloomFilter<num_elements, false_pos_prob> *bf) {
     bf->elements_added = bloom_filter_estimate_elements(bf);
 }
 
-uint64_t bloom_filter_count_intersection_bits_set(BloomFilter *bf1, BloomFilter *bf2) {
+template<uint64_t num_elements, double false_pos_prob>
+uint64_t bloom_filter_count_intersection_bits_set(BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2) {
     // Ensure the bloom filters can be used in an intersection
     if (__check_if_union_or_intersection_ok(bf1, bf1, bf2) == BLOOM_FAILURE) {  // use bf1 as res
         return BLOOM_FAILURE;
@@ -357,25 +385,27 @@ uint64_t bloom_filter_count_intersection_bits_set(BloomFilter *bf1, BloomFilter 
     return res;
 }
 
-float bloom_filter_jaccard_index(BloomFilter *bf1, BloomFilter *bf2) {
+template<uint64_t num_elements, double false_pos_prob>
+double bloom_filter_jaccard_index(BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2) {
     // Ensure the bloom filters can be used in an intersection and union
     if (__check_if_union_or_intersection_ok(bf1, bf1, bf2) == BLOOM_FAILURE) {  // use bf1 as res
-        return (float)BLOOM_FAILURE;
+        return (double)BLOOM_FAILURE;
     }
-    float set_union_bits = (float)bloom_filter_count_union_bits_set(bf1, bf2);
+    double set_union_bits = (double)bloom_filter_count_union_bits_set(bf1, bf2);
     if (set_union_bits == 0) {  // check for divide by 0 error
         return 1.0; // they must be both empty for this to occur and are therefore the same
     }
-    return (float)bloom_filter_count_intersection_bits_set(bf1, bf2) / set_union_bits;
+    return (double)bloom_filter_count_intersection_bits_set(bf1, bf2) / set_union_bits;
 }
 
 /*******************************************************************************
 *    PRIVATE FUNCTIONS
 *******************************************************************************/
-static void __calculate_optimal_hashes(BloomFilter *bf) {
+template<uint64_t num_elements, double false_pos_prob>
+static void __calculate_optimal_hashes(BloomFilter<num_elements, false_pos_prob> *bf) {
     // calc optimized values
     long n = bf->estimated_elements;
-    float p = bf->false_positive_probability;
+    double p = bf->false_positive_probability;
     uint64_t m = ceil((-n * logl(p)) / LOG_TWO_SQUARED);  // AKA pow(log(2), 2);
     unsigned int k = round(LOG_TWO * m / n);             // AKA log(2.0);
     // set paramenters
@@ -389,7 +419,8 @@ static int __sum_bits_set_char(unsigned char c) {
     return bits_set_table[c];
 }
 
-static int __check_if_union_or_intersection_ok(BloomFilter *res, BloomFilter *bf1, BloomFilter *bf2) {
+template<uint64_t num_elements, double false_pos_prob>
+static int __check_if_union_or_intersection_ok(BloomFilter<num_elements, false_pos_prob> *res, BloomFilter<num_elements, false_pos_prob> *bf1, BloomFilter<num_elements, false_pos_prob> *bf2) {
     if (res->number_hashes != bf1->number_hashes || bf1->number_hashes != bf2->number_hashes) {
         return BLOOM_FAILURE;
     } else if (res->number_bits != bf1->number_bits || bf1->number_bits != bf2->number_bits) {

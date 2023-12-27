@@ -3,4 +3,6 @@ Debug
 Release
 RelWithDebInfo
 MinSizeRel
-Debug
+liburing
+gcem
+

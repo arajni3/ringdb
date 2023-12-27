@@ -2,15 +2,28 @@
 
 # first build liburing
 if [ ! -f liburing/src/include/liburing.h ]; then
-chmod +x build_liburing.sh
-./build_liburing.sh
+    chmod +x build_liburing.sh
+    ./build_liburing.sh
+fi
+
+# download gcem if necessary and then build
+if [! -d gcem ]; then
+    git clone https://github.com/kthohr/gcem.git
+fi
+cd ./gcem
+mkdir build
+
+cd build
+cmake ../ -DGCEM_BUILD_TESTS=1 -DCMAKE_INSTALL_PREFIX=/gcem/install/location
+make gcem_tests
+cd ../..
 
 # can alternatively set to Release, RelWithDebInfo, or MinSizeRel
 cmake_config=Debug
 build_dir=${PWD}/${cmake_config}
 
 # if build dir name is not in gitignore, append to it
-if [[ "$(grep -cim1 ${cmake_config} .gitignore)" -ge 1 ]]; then
+if [[ "$(grep -cim1 ${cmake_config} .gitignore)" -eq 0 ]]; then
     echo ${cmake_config} >> .gitignore
 fi 
 

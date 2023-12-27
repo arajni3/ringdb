@@ -30,6 +30,8 @@
 
 #include "aux_data_structures/aux_data_structures_concepts/sstable/stack/stack.hpp"
 
+#include <gcem.hpp>
+
 int main(int, char**){
     typedef ConnectionRequest<BaseRequest> ConnReq;
     typedef ReadWritePool<ConnReq> ReadWritePoolType;
@@ -49,7 +51,7 @@ int main(int, char**){
     8 + level_str_len + 1 + sstable_number_str_len, max_buffer_ring_size, 
     alignof(SSTableInfoUnalignedType)> SSTableInfoType;
 
-    typedef Filter<MEMTABLE_SIZE> FilterType;
+    typedef Filter<static_cast<unsigned int>(MEMTABLE_SIZE / (KEY_LENGTH + VALUE_LENGTH))> FilterType;
     typedef BufferQueue<max_buffer_ring_size, max_sstable_height> BufferQueueType;
     typedef Decomposition<ReqBatch> DecompositionType;
     typedef LevelInfo<FilterType, BufferQueueType, SparseIndex, SSTableInfoType, 
