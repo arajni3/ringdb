@@ -10,9 +10,9 @@
 #include "../../aux_data_structures_concepts/connection_pool/readwrite_pool/readwrite_pool.hpp"
 #include "../../aux_data_structures_concepts/connection_pool/connection_request/connection_request.hpp"
 
-/* largest member of this data structure is the array of sstable infos, so the former will be 
-automatically aligned to avoid false sharing as long as the latter is aligned to avoid false 
-sharing
+/* largest members of this data structure are the array of filters and the array of sstable infos, so 
+the formermost will be automatically aligned to avoid false sharing as long as the latter two are 
+aligned to avoid false sharing
 */
 template<FilterLike Filter, BufferQueueLike BufferQueue, SparseIndexLike SparseIndex, 
 SSTableInfoLike SSTableInfo, DecompositionLike Decomposition, RequestBatchLike RequestBatch, 
