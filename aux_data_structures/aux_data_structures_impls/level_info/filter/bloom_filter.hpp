@@ -89,7 +89,7 @@ struct BloomFilter {
     /* bloom filter */
     unsigned char bloom[
         std::lcm(compile_time_bloom_length(num_elements, false_pos_prob), ALIGN_NO_FALSE_SHARING)
-    ];;
+    ];
     unsigned long bloom_length = std::lcm(
         compile_time_bloom_length(num_elements, false_pos_prob), ALIGN_NO_FALSE_SHARING);
     uint64_t elements_added = 0;
