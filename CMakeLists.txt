@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(RingDB VERSION 1.1.0)
+project(RingDB VERSION 1.2.0)
 
 #[[ this macro should be defined along with the following CMake option set on 
 whenever you want to be in test mode, and otherwise this macro not be defined and the 
