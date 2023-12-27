@@ -450,7 +450,8 @@ class LSMTree {
         ring_params.flags =  IORING_SETUP_SQPOLL
         | IORING_SETUP_SINGLE_ISSUER
         | IORING_SETUP_CQSIZE
-        | IORING_SETUP_DEFER_TASKRUN;
+        | IORING_SETUP_DEFER_TASKRUN 
+        | IORING_SETUP_SQ_AFF;
         ring_params.features = IORING_FEAT_NATIVE_WORKERS;
 
         // put all sq poll threads on CPU 2
