@@ -21,7 +21,7 @@
 #include <numeric>
 #include <cmath>           /* pow, exp */
 #include <cstring>         /* strlen */
-#include <sys/mman.h>       /* mmap, mummap */
+#include <cstdlib>
 
 #include <gcem.hpp>
 
@@ -434,7 +434,6 @@ static int __check_if_union_or_intersection_ok(BloomFilter<num_elements, false_p
 /* NOTE: The caller will free the results */
 static uint64_t* __default_hash(int num_hashes, const char *str) {
     uint64_t *results = (uint64_t*)calloc(num_hashes, sizeof(uint64_t));
-    mlock(results, sizeof(uint64_t) * num_hashes);
     int i;
     for (i = 0; i < num_hashes; ++i) {
         results[i] = __fnv_1a(str, i);
