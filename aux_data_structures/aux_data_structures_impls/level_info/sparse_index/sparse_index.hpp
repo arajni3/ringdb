@@ -61,5 +61,5 @@ struct SparseIndex {
     }
 
     private:
-    char null_key[KEY_LENGTH];
+    char* null_key = new char[KEY_LENGTH];
 };

@@ -474,9 +474,9 @@ class LSMTree {
         sstable info fields, as well as the desired sstable offset field as a bitmask
         should be initialized as necessary in the constructor.
         */
-        char tombstone_value[VALUE_LENGTH];
+        char* tombstone_value = new char[VALUE_LENGTH];
         std::fill(tombstone_value, tombstone_value + VALUE_LENGTH, '\0');
-        char null_key[KEY_LENGTH];
+        char* null_key = new char[KEY_LENGTH];
         std::fill(null_key, null_key + KEY_LENGTH, '\0');
         SSTableInfo* sstable_info;
         struct io_uring_sqe* sqe;
@@ -922,9 +922,9 @@ class LSMTree {
         t.detach();
 
         // start processing incoming requests...
-        char tombstone_value[VALUE_LENGTH];
+        char* tombstone_value = new char[VALUE_LENGTH];
         std::fill(tombstone_value, tombstone_value + VALUE_LENGTH, '\0');
-        char null_key[KEY_LENGTH];
+        char* null_key = new char[KEY_LENGTH];
         std::fill(null_key, null_key + KEY_LENGTH, '\0');
         struct io_uring* main_ring = this->main_thread_comm_ring;
         SparseIndex memtable_sparse_index;
@@ -1347,7 +1347,7 @@ class LSMTree {
             io_uring_submit(network_ring);
         }
 
-        char null_key[KEY_LENGTH];
+        char* null_key = new char[KEY_LENGTH];
         std::fill(null_key, null_key + KEY_LENGTH, '\0');
         #ifdef RINGDB_TEST
         std::thread t(test_ringdb, nullptr);
