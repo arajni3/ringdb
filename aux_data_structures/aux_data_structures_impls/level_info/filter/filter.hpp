@@ -5,7 +5,7 @@
 template<unsigned int num_elements>
 class Filter {
     private:
-    BloomFilter<static_cast<uint64_t>(num_elements), static_cast<double>(FILTER_FALSE_POS_PROB)> 
+    BloomFilter<static_cast<uint64_t>(num_elements), static_cast<float>(FILTER_FALSE_POS_PROB)> 
     filter;
 
     public:
