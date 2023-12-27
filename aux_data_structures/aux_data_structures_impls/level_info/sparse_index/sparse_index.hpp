@@ -41,7 +41,7 @@ struct SparseIndex {
                 return i;
             }
         }
-        return i;
+        return -1;
     }
 
     char* get_table_min_key(unsigned int table_num) {
