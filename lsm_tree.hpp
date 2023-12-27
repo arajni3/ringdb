@@ -441,6 +441,7 @@ class LSMTree {
         and taskrun flag flags and should use peek cqe to get the CQE entries safely.
         */
         struct io_uring_params ring_params;
+        memset(&ring_params, 0, sizeof(io_uring_params));
         /* do not use the coop taskrun or taskrun flag flags because they will 
         cause the peek cqe to be a syscall and thereby 
         prevent being able to poll the completion queue in a fast, syscall-free 
@@ -573,6 +574,7 @@ class LSMTree {
 
                 if (sstable_info->desired_sstable_offset == -2) {
                     // initialize necessary parameters
+                    memset(&ring_params, 0, sizeof(io_uring_params));
                     ring_params.flags = IORING_SETUP_SINGLE_ISSUER
                     | IORING_SETUP_ATTACH_WQ
                     | IORING_SETUP_CQSIZE
