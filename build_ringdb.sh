@@ -7,7 +7,7 @@ if [ ! -f liburing/src/liburing.a ]; then
 fi
 
 # download gcem if necessary and then build
-if [! -d gcem ]; then
+if [ ! -d gcem ]; then
     git clone https://github.com/kthohr/gcem.git
 fi
 cd ./gcem
