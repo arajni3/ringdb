@@ -14,7 +14,7 @@ cd ./gcem
 mkdir build
 
 cd build
-cmake ../ -DGCEM_BUILD_TESTS=1 -DCMAKE_INSTALL_PREFIX=/gcem/install/location
+cmake ../ -DGCEM_BUILD_TESTS=1 -DCMAKE_INSTALL_PREFIX=/usr/local/gcem/
 make gcem_tests
 cd ../..
 
