@@ -28,8 +28,6 @@
 #include "aux_data_structures/aux_data_structures_impls/sstable/sstable_info.hpp"
 #include "aux_data_structures/aux_data_structures_impls/sstable/sstable_info_unaligned.hpp"
 
-#include "aux_data_structures/aux_data_structures_concepts/sstable/stack/stack.hpp"
-
 #include <gcem.hpp>
 
 int main(int, char**){
