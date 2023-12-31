@@ -109,10 +109,20 @@ find_package(Threads REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/liburing/src/include)
 include_directories(${CMAKE_SOURCE_DIR}/gcem/include)
 
+# activate OpenMP extensions
+if (MSVC)
+    # warning level 4
+    add_compile_options(/openmp)
+else()
+    # additional warnings
+    add_compile_options(-fopenmp)
+endif()
+
 add_executable(RingDB main.cpp)
 target_link_libraries(RingDB Threads::Threads)
 target_link_libraries(RingDB ${CMAKE_SOURCE_DIR}/liburing/src/liburing.a)
 target_compile_features(RingDB PUBLIC cxx_std_20)
+
 
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
