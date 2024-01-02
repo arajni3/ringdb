@@ -50,12 +50,13 @@ int main(int, char**){
     typedef Filter<static_cast<unsigned int>(MEMTABLE_SIZE / (KEY_LENGTH + VALUE_LENGTH))> FilterType;
     typedef BufferQueue<max_buffer_ring_size, max_sstable_height> BufferQueueType;
     typedef Decomposition<ReqBatch> DecompositionType;
-    typedef LevelInfo<FilterType, BufferQueueType, SparseIndex, SSTableInfoType, 
+    typedef SparseIndex<KEY_LENGTH + (KEY_LENGTH << 1) * LEVEL_FACTOR> SparseIndexType;
+    typedef LevelInfo<FilterType, BufferQueueType, SparseIndexType, SSTableInfoType, 
     DecompositionType, ReqBatch, ReadWritePoolType, ConnReq> LevelInfoType;
 
-    typedef MemTable<SparseIndex> MemTableType;
+    typedef MemTable<SparseIndexType> MemTableType;
 
-    typedef LSMTree<MemTableType, LevelInfoType, BufferQueueType, FilterType, SparseIndex, 
+    typedef LSMTree<MemTableType, LevelInfoType, BufferQueueType, FilterType, SparseIndexType, 
     DecompositionType, SSTableInfoType, SSTableCacheHelperType, CacheLocation, ReqBatch, 
     ReqBatchWaitQueue, ReqSeg, CacheBufferEntry, StackType, BaseRequest, ConnPool, 
     ConnReq, ReadWritePoolType> RingDB;

@@ -2,7 +2,18 @@
 #include <cstring>
 #include <algorithm>
 
-struct SparseIndex {
+template<std::size_t old_size>
+consteval unsigned int sparse_index_align() {
+    std::size_t res = std::lcm(old_size, ALIGN_NO_FALSE_SHARING);
+    std::size_t power = 1;
+    while (power < res) {
+        power <<= 1;
+    }
+    return power;
+}
+
+template<unsigned int struct_size>
+struct alignas(sparse_index_align<struct_size>()) SparseIndex {
     char index[(KEY_LENGTH << 1) * LEVEL_FACTOR];
 
     SparseIndex() {
