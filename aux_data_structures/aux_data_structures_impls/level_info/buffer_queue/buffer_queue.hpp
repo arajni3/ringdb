@@ -2,12 +2,11 @@
 #include <atomic>
 #include <numeric>
 
-template<unsigned int length>
+template<std::size_t length>
 consteval unsigned int align() {
-    unsigned int res = std::lcm(length, ALIGN_NO_FALSE_SHARING), power = 1, exponent = 0;
+    std::size_t res = std::lcm(length, ALIGN_NO_FALSE_SHARING), power = 1;
     while (power < res) {
         power <<= 1;
-        ++exponent;
     }
     return power;
 }

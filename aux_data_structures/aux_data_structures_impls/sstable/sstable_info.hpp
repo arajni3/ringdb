@@ -6,11 +6,20 @@
 #include "../../aux_data_structures_concepts/sstable/stack/stack.hpp"
 #include <numeric>
 
+template<unsigned int alignment>
+consteval unsigned int sstable_align() {
+    unsigned int res = std::lcm(alignment, ALIGN_NO_FALSE_SHARING), power = 1;
+    while (power < 1) {
+        power <<= 1;
+    }
+    return power;
+}
+
 // this data structure is aligned to avoid false sharing
 template<RequestBatchLike RequestBatch, RequestBatchWaitQueueLike RequestBatchWaitQueue, 
 SSTableCacheHelperLike SSTableCacheHelper, StackLike Stack, int file_path_length, 
-unsigned int max_num_buffers, unsigned int alignment>
-struct alignas(alignment) SSTableInfo {
+unsigned int max_num_buffers, std::size_t alignment>
+struct alignas(sstable_align<alignment>()) SSTableInfo {
     RequestBatchWaitQueue req_batch_wq;
     char file_path[file_path_length];
     bool is_flushed_to = false;
