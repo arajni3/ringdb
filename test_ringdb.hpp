@@ -48,6 +48,8 @@ void test_ringdb(void* unused) {
             std::cout << "failed read test";
         }
         close(s);
-        system("rm -R /sstab1e");
+        if (system("rm -R /sstab1e") == -1) {
+
+        }
     }
 }
