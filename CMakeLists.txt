@@ -118,7 +118,7 @@ else()
     add_compile_options(-fopenmp)
 endif()
 
-set(CMAKE_CXX_FLAGS "-O3")
+set(CMAKE_CXX_FLAGS "-O2")
 add_executable(RingDB main.cpp)
 target_link_libraries(RingDB Threads::Threads)
 target_link_libraries(RingDB ${CMAKE_SOURCE_DIR}/liburing/src/liburing.a)
