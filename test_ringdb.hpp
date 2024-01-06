@@ -49,7 +49,7 @@ void test_ringdb(void* unused) {
         }
         close(s);
         if (system("rm -R /sstab1e") == -1) {
-
+            std::cout << "\nFailed to delete test directory /sstab1e";
         }
     }
 }
