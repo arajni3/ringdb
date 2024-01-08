@@ -111,10 +111,8 @@ include_directories(${CMAKE_SOURCE_DIR}/gcem/include)
 
 # activate OpenMP extensions
 if (MSVC)
-    # warning level 4
     add_compile_options(/openmp)
 else()
-    # additional warnings
     add_compile_options(-fopenmp)
 endif()
 
