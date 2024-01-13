@@ -39,8 +39,8 @@
 #define BLOOMFILTER_MINOR 8
 #define BLOOMFILTER_REVISION 2
 
-#define BLOOM_SUCCESS 0
-#define BLOOM_FAILURE -1
+#define BLOOM_SUCCESS 1
+#define BLOOM_FAILURE 0
 
 #define bloom_filter_get_version()    (BLOOMFILTER_VERSION)
 
@@ -265,6 +265,7 @@ int bloom_filter_add_string_alt(BloomFilter<num_elements, false_pos_prob> *bf, u
         return BLOOM_FAILURE;
     }
 
+    #pragma omp parallel for
     for (unsigned int i = 0; i < bf->number_hashes; ++i) {
         unsigned long idx = (hashes[i] % bf->number_bits) / 8;
         int bit = (hashes[i] % bf->number_bits) % 8;
@@ -273,7 +274,6 @@ int bloom_filter_add_string_alt(BloomFilter<num_elements, false_pos_prob> *bf, u
         bf->bloom[idx] |= (1 << bit); // set the bit
     }
 
-    #pragma omp atomic update
     bf->elements_added++;
     return BLOOM_SUCCESS;
 }
@@ -288,13 +288,13 @@ int bloom_filter_check_string_alt(BloomFilter<num_elements, false_pos_prob> *bf,
 
     unsigned int i;
     int r = BLOOM_SUCCESS;
+
+    #pragma omp parallel for
     for (i = 0; i < bf->number_hashes; ++i) {
-        int tmp_check = CHECK_BIT(bf->bloom, (hashes[i] % bf->number_bits));
-        if (tmp_check == 0) {
-            r = BLOOM_FAILURE;
-            break; // no need to continue checking
-        }
+        #pragma omp atomic update
+        r = CHECK_BIT(bf->bloom, (hashes[i] % bf->number_bits));
     }
+
     return r;
 }
 
