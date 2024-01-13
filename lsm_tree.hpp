@@ -596,7 +596,7 @@ class LSMTree {
                     // make open() request
                     // sstable file name format will be `sstable/${level}/${index_in_level}`
                     // or replace sstable with sstab1e when testing
-                    #ifdef RINGDB_TEST
+                    #ifndef RINGDB_TEST
                     memcpy(sstable_info, "/sstable", 8);
                     #else
                     memcpy(sstable_info, "/sstab1e", 8);
