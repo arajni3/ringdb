@@ -902,8 +902,9 @@ class LSMTree {
                                 /* remove entries from sparse buffer index by
                                 buffer id
                                 */
+
                                 sstable_info->cache_helper.remove_buffer_range(
-                                    sstable_info->insert_buffers_from + 1, original_insert_from
+                                    ++sstable_info->insert_buffers_from, original_insert_from
                                 );
                                 if (!prev_buffer_queue->guard.is_single_thread) [[unlikely]] {
                                     prev_buffer_queue->guard.atomic_guard.store(0);
@@ -1226,7 +1227,7 @@ class LSMTree {
                                     ++num_old_buffers_given;
                                 };
                                 sstable_info->cache_helper.remove_buffer_range(
-                                    sstable_info->insert_buffers_from + 1, original_insert_from
+                                    ++sstable_info->insert_buffers_from, original_insert_from
                                 );
                                 for (j = 0; j < proportional_new_quantity && 
                                 num_new_buffers_given < num_new_buffers; ++j) {
