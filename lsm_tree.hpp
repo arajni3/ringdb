@@ -897,7 +897,7 @@ class LSMTree {
                                 for (int i = 0; i < to_give; ++i) {
                                     prev_buffer_queue->push_back(
                                         sstable_info->page_cache_buffers[
-                                            sstable_info->insert_buffers_from-- - 1]);
+                                            --sstable_info->insert_buffers_from]);
                                 }
                                 /* remove entries from sparse buffer index by
                                 buffer id
@@ -1222,7 +1222,7 @@ class LSMTree {
                                 for (j = 0; j < proportional_old_quantity && 
                                 num_old_buffers_given < old_buffer_limit; ++i) {
                                     bq->push_back(sstable_info->page_cache_buffers[
-                                        sstable_info->insert_buffers_from-- - 1]);
+                                        --sstable_info->insert_buffers_from]);
                                     ++num_old_buffers_given;
                                 };
                                 sstable_info->cache_helper.remove_buffer_range(
