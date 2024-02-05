@@ -35,14 +35,14 @@ class RequestBatchWaitQueue {
         }
     }
 
-    bool try_push_back(RequestBatch* req_batch, bool could_contend_head) {
+    bool try_push_back(RequestBatch* req_batch, bool could_contend_with_consumer) {
         if (guard.is_single_thread) [[likely]] {
             if (!front) {
                 front = back = new Node(req_batch);
             } else {
                 back = back->next = new Node(req_batch);
             }
-        } else if (could_contend_head) [[unlikely]] {
+        } else if (could_contend_with_consumer) [[unlikely]] {
             if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
                 return false;
             }
@@ -57,7 +57,7 @@ class RequestBatchWaitQueue {
                 }
                 back = back->next = new Node(req_batch);
             } else [[unlikely]] {
-                front = back = new Node(req_batch;)
+                front = back = new Node(req_batch);
             }
         }
         guard.size.fetch_add(1);

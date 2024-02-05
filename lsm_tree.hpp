@@ -1098,9 +1098,9 @@ class LSMTree {
         for (unsigned int r = 0; r < LEVEL_FACTOR; ++r) {
             inserted[r] = false;
         }
-        bool could_contend_head[LEVEL_FACTOR];
+        bool could_contend_with_consumer[LEVEL_FACTOR];
         for (unsigned int r = 0; r < LEVEL_FACTOR; ++r) {
-            could_contend_head[LEVEL_FACTOR] = false;
+            could_contend_with_consumer[LEVEL_FACTOR] = false;
         }
 
         unsigned int num_queued = 0;
@@ -1178,9 +1178,11 @@ class LSMTree {
                     to memory in the order of operations listed here, not out of
                     order.
                     */
-                    could_contend_head[i] = !wq->try_push_back(batches[i], could_contend_head[i]);
+                    could_contend_with_consumer[i] = !wq->try_push_back(batches[i], 
+                        could_contend_with_consumer[i]
+                    );
 
-                    if (!could_contend_head[i]) { // successful
+                    if (!could_contend_with_consumer[i]) { // successful
                         if (batches[LEVEL_FACTOR]) {
                             wq->not_found_push_back(batches[LEVEL_FACTOR]);
                             batches[LEVEL_FACTOR] = nullptr;
@@ -1193,6 +1195,12 @@ class LSMTree {
                         wq->guard.atomic_producer_guard.store(1);
                         my_zero = 0;
                     }
+
+                    /* no point in producer thread releasing producer trylock for another producer 
+                    if it was contending with the consumer thread because then the other producer 
+                    may contend with the consumer too and waste more time than if the original 
+                    producer kept the trylock and (non-blockingly) waited for the producer to finish
+                    */
                 }
             }
         }

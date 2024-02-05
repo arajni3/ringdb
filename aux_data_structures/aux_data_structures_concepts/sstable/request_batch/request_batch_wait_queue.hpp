@@ -22,7 +22,7 @@ concept RequestBatchWaitQueueLike = requires(RequestBatchWaitQueue req_batch_wq)
 
 template<typename RequestBatchWaitQueue, typename RequestBatch>
 concept RequestBatchWaitQueuePushBack = requires(
-    RequestBatchWaitQueue req_batch_wq, RequestBatch* req_batch, bool could_contend_head
+    RequestBatchWaitQueue req_batch_wq, RequestBatch* req_batch, bool could_contend_with_consumer
 ) {
 
     requires RequestBatchWaitQueueLike<RequestBatchWaitQueue>;
@@ -31,7 +31,7 @@ concept RequestBatchWaitQueuePushBack = requires(
     respectively. Try to enqueue to the queue in a lock-free manner. Returns true if successful and 
     false otherwise.
     */ 
-    {req_batch_wq.try_push_back(req_batch, could_contend_head)} -> std::same_as<bool>;
+    {req_batch_wq.try_push_back(req_batch, could_contend_with_consumer)} -> std::same_as<bool>;
 
     // regular unconditional enqueue for a request batch that was not found in the next level
     {req_batch_wq.not_found_push_back(req_batch)} -> std::same_as<void>;
