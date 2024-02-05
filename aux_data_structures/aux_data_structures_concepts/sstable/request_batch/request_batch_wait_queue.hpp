@@ -9,9 +9,16 @@ concept RequestBatchWaitQueueLike = requires(RequestBatchWaitQueue req_batch_wq)
     ever.
     */
     requires std::same_as<bool, decltype(req_batch_wq.guard.is_single_thread)>;
-    // these two fields and the previous field should be packed into a named struct named "guard"
+    // these fields and the previous field should be packed into a named struct named "guard"
     requires std::same_as<std::atomic_uchar, decltype(req_batch_wq.guard.atomic_consumer_guard)>;
     requires std::same_as<std::atomic_uchar, decltype(req_batch_wq.guard.atomic_producer_guard)>;
+    /* atomically records the size of the queue to indirectly synchronize the consumer and the 
+    current producer so that the producer can tend to the end of the queue without being blocked 
+    by the consumer if it does not have to be (i.e., if the queue size is greater than 1); the small 
+    tradeoff is that, in case of contending with the consumer (which should be rare), an extra atomic 
+    load operation, namely, of this size variable, will have been performed
+    */
+    requires std::same_as<std::atomic_uint, decltype(req_batch_wq.guard.size)>;
     
     /* If not single-threaded, must acquire and release the consumer guard before and after calling, 
     respectively
