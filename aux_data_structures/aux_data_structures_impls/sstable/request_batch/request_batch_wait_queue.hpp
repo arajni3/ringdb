@@ -73,7 +73,6 @@ class RequestBatchWaitQueue {
                 front = node;
                 return req_batch;
             }
-            return nullptr;
         } else if (guard.size.load()) {
             guard.size.fetch_sub(1);
             RequestBatch* req_batch = front->req_batch;
