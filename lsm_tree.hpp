@@ -1184,7 +1184,7 @@ class LSMTree {
 
                     if (!could_contend_with_consumer[i]) { // successful
                         if (batches[LEVEL_FACTOR]) {
-                            wq->not_found_push_back(batches[LEVEL_FACTOR]);
+                            wq->standard_push_back(batches[LEVEL_FACTOR]);
                             batches[LEVEL_FACTOR] = nullptr;
                         }
                         ++num_queued;

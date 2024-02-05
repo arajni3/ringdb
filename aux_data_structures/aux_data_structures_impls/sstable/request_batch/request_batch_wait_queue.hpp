@@ -27,7 +27,7 @@ class RequestBatchWaitQueue {
 
     public:
 
-    void not_found_push_back(RequestBatch* req_batch) {
+    void standard_push_back(RequestBatch* req_batch) {
         if (!front) {
             front = back = new Node(req_batch);
         } else {
@@ -37,16 +37,12 @@ class RequestBatchWaitQueue {
 
     bool try_push_back(RequestBatch* req_batch, bool could_contend_with_consumer) {
         if (guard.is_single_thread) [[likely]] {
-            if (!front) {
-                front = back = new Node(req_batch);
-            } else {
-                back = back->next = new Node(req_batch);
-            }
+            standard_push_back(req_batch);
         } else if (could_contend_with_consumer) [[unlikely]] {
             if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
                 return false;
             }
-            back = back->next = new Node(req_batch);
+            standard_push_back(req_batch);
         } else [[likely]] {
             int size_var = guard.size.load();
             if (size_var > 1) [[likely]] {
@@ -55,7 +51,7 @@ class RequestBatchWaitQueue {
                 if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
                     return false;
                 }
-                back = back->next = new Node(req_batch);
+                standard_push_back(req_batch);
             } else [[unlikely]] {
                 front = back = new Node(req_batch);
             }
