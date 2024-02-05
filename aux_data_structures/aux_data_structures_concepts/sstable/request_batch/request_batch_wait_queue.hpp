@@ -9,9 +9,9 @@ concept RequestBatchWaitQueueLike = requires(RequestBatchWaitQueue req_batch_wq)
     ever.
     */
     requires std::same_as<bool, decltype(req_batch_wq.guard.is_single_thread)>;
-    // this and the previous field should be packed into a named struct named "guard"
-    requires std::same_as<std::atomic_uchar, decltype(req_batch_wq.guard.atomic_guard)>;
-    
+    // these two fields and the previous field should be packed into a named struct named "guard"
+    requires std::same_as<std::atomic_uchar, decltype(req_batch_wq.guard.atomic_consumer_guard)>;
+    requires std::same_as<std::atomic_uchar, decltype(req_batch_wq.guard.atomic_producer_guard)>;
     requires RequestBatchLike<std::remove_reference_t<decltype(
         *req_batch_wq.pop_front())>>;
 };

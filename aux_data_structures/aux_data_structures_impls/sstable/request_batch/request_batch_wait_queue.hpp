@@ -14,8 +14,9 @@ struct alignas(ALIGN_NO_FALSE_SHARING) RequestBatchWaitQueueNode {
 template<RequestBatchLike RequestBatch>
 class RequestBatchWaitQueue {
     public:
-    struct alignas(ALIGN_NO_FALSE_SHARING) {
-        std::atomic_uchar atomic_guard{1};
+    struct {
+        alignas(ALIGN_NO_FALSE_SHARING) std::atomic_uchar atomic_consumer_guard{1};
+        alignas(ALIGN_NO_FALSE_SHARING) std::atomic_uchar atomic_producer_guard{1};
         bool is_single_thread;
     } guard;
 
