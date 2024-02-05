@@ -1189,11 +1189,11 @@ class LSMTree {
                         }
                         ++num_queued;
                         inserted[i] = true;
-                    }
-
-                    if (!wq->guard.is_single_thread) [[unlikely]] {
-                        wq->guard.atomic_producer_guard.store(1);
-                        my_zero = 0;
+                        
+                        if (!wq->guard.is_single_thread) [[unlikely]] {
+                            wq->guard.atomic_producer_guard.store(1);
+                            my_zero = 0;
+                        }
                     }
 
                     /* no point in producer thread releasing producer trylock for another producer 
