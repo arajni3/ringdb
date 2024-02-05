@@ -16,6 +16,7 @@ class RequestBatchWaitQueue {
     public:
     struct {
         alignas(ALIGN_NO_FALSE_SHARING) std::atomic_uchar atomic_consumer_guard{1};
+        alignas(ALIGN_NO_FALSE_SHARING) std::atomic_uint size{0};
         alignas(ALIGN_NO_FALSE_SHARING) std::atomic_uchar atomic_producer_guard{1};
         bool is_single_thread;
     } guard;
@@ -26,18 +27,46 @@ class RequestBatchWaitQueue {
 
     public:
 
-    void push_back(RequestBatch* req_batch) {
-        if (!front) {
-            front = new Node(req_batch);
-            back = front;
-        } else {
-            back->next = new Node(req_batch);
-            back = back->next;
+    bool try_push_back(RequestBatch* req_batch, bool could_contend_head) {
+        if (guard.is_single_thread) [[likely]] {
+            if (!front) {
+                front = back = new Node(req_batch);
+            } else {
+                back = back->next = new Node(req_batch);
+            }
+        } else if (could_contend_head) [[unlikely]] {
+            if (guard.atomic_consumer_guard.load()) [[unlikely]] {
+                return false;
+            }
+            back = back->next = new Node(req_batch);
+        } else [[likely]] {
+            int size_var = guard.size.load();
+            if (size_var > 1) [[likely]] {
+                back = back->next = new Node(req_batch);
+            } else if (size_var == 1) [[unlikely]] {
+                if (guard.atomic_consumer_guard.load()) [[unlikely]] {
+                    return false;
+                }
+                back = back->next = new Node(req_batch);
+            } else [[unlikely]] {
+                front = back = new Node(req_batch;)
+            }
+            size.fetch_add(1);
         }
+        return true;
     }
 
     RequestBatch* pop_front() {
-        if (front) {
+        if (guard.is_single_thread) [[likely]] {
+            if (front) {
+                RequestBatch* req_batch = front->req_batch;
+                Node* node = front->next;
+                delete front;
+                front = node;
+                return req_batch;
+            }
+            return nullptr;
+        } else if (size.fetch_sub(1)) {
             RequestBatch* req_batch = front->req_batch;
             Node* node = front->next;
             delete front;
