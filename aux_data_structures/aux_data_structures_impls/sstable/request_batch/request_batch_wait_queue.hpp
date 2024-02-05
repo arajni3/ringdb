@@ -59,8 +59,8 @@ class RequestBatchWaitQueue {
             } else [[unlikely]] {
                 front = back = new Node(req_batch;)
             }
-            size.fetch_add(1);
         }
+        guard.size.fetch_add(1);
         return true;
     }
 
@@ -74,7 +74,8 @@ class RequestBatchWaitQueue {
                 return req_batch;
             }
             return nullptr;
-        } else if (size.fetch_sub(1)) {
+        } else if (guard.size.load()) {
+            guard.size.fetch_sub(1);
             RequestBatch* req_batch = front->req_batch;
             Node* node = front->next;
             delete front;
