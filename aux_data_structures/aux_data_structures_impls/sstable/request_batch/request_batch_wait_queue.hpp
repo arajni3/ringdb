@@ -27,6 +27,14 @@ class RequestBatchWaitQueue {
 
     public:
 
+    void not_found_push_back(RequestBatch* req_batch) {
+        if (!front) {
+            front = back = new Node(req_batch);
+        } else {
+            back = back->next = new Node(req_batch);
+        }
+    }
+
     bool try_push_back(RequestBatch* req_batch, bool could_contend_head) {
         if (guard.is_single_thread) [[likely]] {
             if (!front) {

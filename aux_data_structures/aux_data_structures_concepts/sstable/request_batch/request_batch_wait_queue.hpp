@@ -32,4 +32,8 @@ concept RequestBatchWaitQueuePushBack = requires(
     false otherwise.
     */ 
     {req_batch_wq.try_push_back(req_batch, could_contend_head)} -> std::same_as<bool>;
+
+    // regular unconditional enqueue for a request batch that was not found in the next level
+    {req_batch_wq.not_found_push_back(req_batch)} -> std::same_as<void>;
+
 };

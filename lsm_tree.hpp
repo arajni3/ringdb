@@ -758,11 +758,11 @@ class LSMTree {
                     simple and fast
                     */
                     while (!sstable_info->req_batch_wq.guard.is_single_thread && 
-                    !sstable_info->req_batch_wq.guard.atomic_guard.compare_exchange_weak(
+                    !sstable_info->req_batch_wq.guard.atomic_consumer_guard.compare_exchange_weak(
                         my_zero, 1)) [[unlikely]];
                     sstable_info->req_batch = sstable_info->req_batch_wq
                     .pop_front();
-                    sstable_info->req_batch_wq.guard.atomic_guard.store(0);
+                    sstable_info->req_batch_wq.guard.atomic_consumer_guard.store(0);
                     my_zero = 0;
                     if (sstable_info->req_batch) {
                         if (sstable_info->req_batch->req_type == READ) {
@@ -1098,6 +1098,11 @@ class LSMTree {
         for (unsigned int r = 0; r < LEVEL_FACTOR; ++r) {
             inserted[r] = false;
         }
+        bool could_contend_head[LEVEL_FACTOR];
+        for (unsigned int r = 0; r < LEVEL_FACTOR; ++r) {
+            could_contend_head[LEVEL_FACTOR] = false;
+        }
+
         unsigned int num_queued = 0;
         RequestBatch** batches = decomp.decomposition;
         RequestBatchWaitQueue* wq;
@@ -1167,25 +1172,27 @@ class LSMTree {
             for (unsigned int i = 0; i < LEVEL_FACTOR; ++i) {
                 wq = &(level_infos[level].sstable_infos[i].req_batch_wq);
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
-                wq->guard.atomic_guard.compare_exchange_weak(my_zero, 1))) {
+                wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1))) {
                     /* Must use strong ordering for both CAS and following store so
                     that the following wq.push_back operation is always committed 
                     to memory in the order of operations listed here, not out of
                     order.
                     */
-                    wq->push_back(batches[i]);
+                    could_contend_head[i] = !wq->try_push_back(batches[i], could_contend_head[i]);
 
-                    if (batches[LEVEL_FACTOR]) {
-                        wq->push_back(batches[LEVEL_FACTOR]);
-                        batches[LEVEL_FACTOR] = nullptr;
+                    if (!could_contend_head[i]) { // successful
+                        if (batches[LEVEL_FACTOR]) {
+                            wq->not_found_push_back(batches[LEVEL_FACTOR]);
+                            batches[LEVEL_FACTOR] = nullptr;
+                        }
+                        ++num_queued;
+                        inserted[i] = true;
                     }
 
                     if (!wq->guard.is_single_thread) [[unlikely]] {
-                        wq->guard.atomic_guard.store(0);
+                        wq->guard.atomic_producer_guard.store(0);
                         my_zero = 0;
                     }
-                    ++num_queued;
-                    inserted[i] = true;
                 }
             }
         }
