@@ -762,7 +762,7 @@ class LSMTree {
                         my_zero, 1)) [[unlikely]];
                     sstable_info->req_batch = sstable_info->req_batch_wq
                     .pop_front();
-                    sstable_info->req_batch_wq.guard.atomic_consumer_guard.store(0);
+                    sstable_info->req_batch_wq.guard.atomic_consumer_guard.store(1);
                     my_zero = 0;
                     if (sstable_info->req_batch) {
                         if (sstable_info->req_batch->req_type == READ) {
@@ -852,7 +852,7 @@ class LSMTree {
                             new_buffers[num_new_buffers] = buffer_queue->pop_front();
                             }
                             if (!buffer_queue->guard.is_single_thread) [[unlikely]] {
-                                buffer_queue->guard.atomic_guard.store(0);
+                                buffer_queue->guard.atomic_guard.store(1);
                                 my_zero = 0;
                             }
 
@@ -866,7 +866,7 @@ class LSMTree {
                                     num_new_buffers]);
                             }   
                             if (!prev_buffer_queue->guard.is_single_thread) [[unlikely]] {
-                                prev_buffer_queue->guard.atomic_guard.store(0);
+                                prev_buffer_queue->guard.atomic_guard.store(1);
                                 my_zero = 0;
                             }
                         } else if (level > 0) { 
@@ -886,7 +886,7 @@ class LSMTree {
                             if (to_give) {
                                 buffer_queue->cur_num_buffers -= to_give;
                                 if (!buffer_queue->guard.is_single_thread) [[unlikely]] {
-                                    buffer_queue->guard.atomic_guard.store(0);
+                                    buffer_queue->guard.atomic_guard.store(1);
                                     my_zero = 0;
                                 }
                                 while (!prev_buffer_queue->guard.is_single_thread && 
@@ -907,7 +907,7 @@ class LSMTree {
                                     ++sstable_info->insert_buffers_from, original_insert_from
                                 );
                                 if (!prev_buffer_queue->guard.is_single_thread) [[unlikely]] {
-                                    prev_buffer_queue->guard.atomic_guard.store(0);
+                                    prev_buffer_queue->guard.atomic_guard.store(1);
                                     my_zero = 0;    
                                 }   
                                 this->reregister_buffer_ring(sstable_info);   
@@ -1034,7 +1034,7 @@ class LSMTree {
                     sstable_info.cache_helper.add_buffer();
                 }
                 if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
-                    buffer_queue.guard.atomic_guard.store(0);
+                    buffer_queue.guard.atomic_guard.store(1);
                 }
                 io_uring_buf_ring_advance(sstable_info.buffer_ring, 
                 new_num_added);
@@ -1086,7 +1086,7 @@ class LSMTree {
         RequestType req_type = batch->req_type;
         Decomposition decomp = level_infos[level].decompose(batch);
         if (!level_infos[level].guard.is_single_thread) [[unlikely]] {
-            level_infos[level].guard.atomic_guard.store(0);
+            level_infos[level].guard.atomic_guard.store(1);
         }
 
         delete batch;
@@ -1164,7 +1164,7 @@ class LSMTree {
             io_uring_buf_ring_advance(sstable_info->buffer_ring, num_added_to_current);
 
             if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
-                buffer_queue.guard.atomic_guard.store(0);
+                buffer_queue.guard.atomic_guard.store(1);
                 my_zero = 0;
             }
         }
@@ -1190,7 +1190,7 @@ class LSMTree {
                     }
 
                     if (!wq->guard.is_single_thread) [[unlikely]] {
-                        wq->guard.atomic_producer_guard.store(0);
+                        wq->guard.atomic_producer_guard.store(1);
                         my_zero = 0;
                     }
                 }
@@ -1249,12 +1249,12 @@ class LSMTree {
                                 }
 
                                 if (!bq->guard.is_single_thread) [[unlikely]] {
-                                    bq->guard.atomic_guard.store(0);
+                                    bq->guard.atomic_guard.store(1);
                                     my_zero = 0;
                                 }
 
                             } else if (!bq->guard.is_single_thread) [[unlikely]] {
-                                bq->guard.atomic_guard.store(0);
+                                bq->guard.atomic_guard.store(1);
                                 my_zero = 0;
                             }
                         }
