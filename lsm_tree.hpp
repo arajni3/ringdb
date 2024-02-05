@@ -1174,7 +1174,7 @@ class LSMTree {
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
                 wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1))) {
                     /* Must use strong ordering for both CAS and following store so
-                    that the following wq.push_back operation is always committed 
+                    that the following wq push_back operations are always committed 
                     to memory in the order of operations listed here, not out of
                     order.
                     */
