@@ -43,7 +43,7 @@ class RequestBatchWaitQueue {
                 back = back->next = new Node(req_batch);
             }
         } else if (could_contend_head) [[unlikely]] {
-            if (guard.atomic_consumer_guard.load()) [[unlikely]] {
+            if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
                 return false;
             }
             back = back->next = new Node(req_batch);
@@ -52,7 +52,7 @@ class RequestBatchWaitQueue {
             if (size_var > 1) [[likely]] {
                 back = back->next = new Node(req_batch);
             } else if (size_var == 1) [[unlikely]] {
-                if (guard.atomic_consumer_guard.load()) [[unlikely]] {
+                if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
                     return false;
                 }
                 back = back->next = new Node(req_batch);
