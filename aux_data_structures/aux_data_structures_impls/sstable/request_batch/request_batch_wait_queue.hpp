@@ -23,7 +23,8 @@ class RequestBatchWaitQueue {
 
     private:
     typedef RequestBatchWaitQueueNode<RequestBatch> Node;
-    Node* front = nullptr, *back;
+    alignas(ALIGN_NO_FALSE_SHARING) Node* front = nullptr;
+    alignas(ALIGN_NO_FALSE_SHARING) Node* back;
 
     public:
 
