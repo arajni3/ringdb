@@ -34,9 +34,18 @@ class RequestBatchWaitQueue {
         } else {
             back = back->next = new Node(req_batch);
         }
+        /* perform size change only after actually completing the queue modification so that consumer 
+        thread does not operate on the otherwise-unsynchronized list nodes before the list nodes have 
+        actually finished being modified
+        */
+        guard.size.fetch_add(1);
     }
 
     bool try_push_back(RequestBatch* req_batch, bool could_contend_with_consumer) {
+        /* all atomic loads here must have acquire semantics to be synchronized perfectly with the 
+        consumer, and in fact they must have sequential consistency because they all guard a critical 
+        path
+        */
         if (guard.is_single_thread) [[likely]] {
             standard_push_back(req_batch);
         } else if (could_contend_with_consumer) [[unlikely]] {
@@ -57,7 +66,6 @@ class RequestBatchWaitQueue {
                 front = back = new Node(req_batch);
             }
         }
-        guard.size.fetch_add(1);
         return true;
     }
 
@@ -70,11 +78,19 @@ class RequestBatchWaitQueue {
                 front = node;
                 return req_batch;
             }
+        /* atomic load here must have acquire semantics to be synchronized perfectly with the 
+        producer, and in fact it must have sequential consistency because it guards the critical 
+        path
+        */
         } else if (guard.size.load()) {
             RequestBatch* req_batch = front->req_batch;
             Node* node = front->next;
             delete front;
             front = node;
+            /* perform size change only after actually completing the queue modification so that 
+            producer thread does not operate on the otherwise-unsynchronized list nodes before the 
+            list nodes have actually finished being modified
+            */
             guard.size.fetch_sub(1);
             return req_batch;
         }
