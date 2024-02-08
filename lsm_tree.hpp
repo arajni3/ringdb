@@ -1089,12 +1089,13 @@ class LSMTree {
         Decomposition decomp = level_infos[level].decompose(batch);
         if (!level_infos[level].guard.is_single_thread) [[unlikely]] {
             level_infos[level].guard.atomic_guard.store(1);
+            my_zero = 0;
         }
 
         if (req_type != COMPACTION) {
             delete batch;
         }
-        
+
         if (!level) {
             batch = new RequestBatch(req_type);
         }
