@@ -50,10 +50,6 @@ struct LevelInfo {
         i = 0;
 
         if (req_batch->req_type == READ) {
-            bool initialized_batch[LEVEL_FACTOR + 1];
-            for (i = 0; i <= LEVEL_FACTOR; ++i) {
-                initialized_batch[i] = false;
-            }
             int left_index, right_index;
             char* min_key, *max_key;
             ReadWritePool& rw_pool = req_batch->content.readwrite_pool;
@@ -68,19 +64,17 @@ struct LevelInfo {
                 for (j = left_index; j < right_index; ++j) {
                     conn_req = rw_pool.data + j;
                     if (filters[i].prob_contains_key(conn_req->buffer + 5)) {
-                        if (!initialized_batch[i]) [[unlikely]] {
+                        if (decomp.decomposition[i]) [[unlikely]] {
                             decomp.decomposition[i] = new RequestBatch(READ);
                             decomp.decomposition[i]->content.readwrite_pool.present_in_level = 
                             true;
-                            initialized_batch[i] = true;
                         }
                         decomp.decomposition[i]->insert_read_write(conn_req->buffer, 
                         conn_req->client_sock_fd, conn_req->req_type);
                         ++decomp.expected_sstable_sizes[i];
                     } else { // definitely not in this sstable hence in any sstable
-                        if (!initialized_batch[LEVEL_FACTOR]) { [[unlikely]]
+                        if (!decomp.decomposition[LEVEL_FACTOR]) { [[unlikely]]
                             decomp.decomposition[LEVEL_FACTOR] = new RequestBatch(READ);
-                            initialized_batch[i] = true;
                             decomp.decomposition[i]->content.readwrite_pool.present_in_level = 
                             false;
                         }
@@ -95,7 +89,7 @@ struct LevelInfo {
             for (i = 0; i < rw_pool.length; ++i) {
                 conn_req = rw_pool.data + i;
                 if (conn_req->client_sock_fd != -1) { // not contained in an sstable range
-                    if (!initialized_batch[LEVEL_FACTOR]) { [[unlikely]]
+                    if (!decomp.decomposition[LEVEL_FACTOR]) { [[unlikely]]
                         decomp.decomposition[LEVEL_FACTOR] = new RequestBatch(READ);
                         decomp.decomposition[i]->content.readwrite_pool.present_in_level = false;
                     }
