@@ -84,14 +84,15 @@ class RequestBatchWaitQueue {
         */
         } else if (guard.size.load()) {
             RequestBatch* req_batch = front->req_batch;
-            Node* node = front->next;
-            delete front;
+            Node* node = front->next, node2 = front;
             front = node;
             /* perform size change only after actually completing the queue modification so that 
             producer thread does not operate on the otherwise-unsynchronized list nodes before the 
             list nodes have actually finished being modified
             */
             guard.size.fetch_sub(1);
+            // delete old front node outside of size critical path to improve performance
+            delete node2;
             return req_batch;
         }
         return nullptr;
