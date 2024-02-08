@@ -760,9 +760,10 @@ class LSMTree {
                     while (!sstable_info->req_batch_wq.guard.is_single_thread && 
                     !sstable_info->req_batch_wq.guard.atomic_consumer_guard.compare_exchange_weak(
                         my_zero, 1)) [[unlikely]];
+                    /* consumer guard will be freed for us in pop_front(), necessary for performance
+                    */
                     sstable_info->req_batch = sstable_info->req_batch_wq
                     .pop_front();
-                    sstable_info->req_batch_wq.guard.atomic_consumer_guard.store(1);
                     my_zero = 0;
                     if (sstable_info->req_batch) {
                         if (sstable_info->req_batch->req_type == READ) {

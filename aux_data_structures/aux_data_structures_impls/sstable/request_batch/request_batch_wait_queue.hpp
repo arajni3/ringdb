@@ -91,7 +91,11 @@ class RequestBatchWaitQueue {
             list nodes have actually finished being modified
             */
             guard.size.fetch_sub(1);
-            // delete old front node outside of size critical path to improve performance
+            /* delete old front node outside of entire critical path to minimize time spent waiting 
+            to update size and free up consumer guard and thereby maximize performance without 
+            exposing internal implementation to the rest of the application
+            */
+            guard.atomic_consumer_guard.store(1);
             delete node2;
             return req_batch;
         }

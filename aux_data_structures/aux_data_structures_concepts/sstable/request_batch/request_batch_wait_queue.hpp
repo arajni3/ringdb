@@ -20,8 +20,11 @@ concept RequestBatchWaitQueueLike = requires(RequestBatchWaitQueue req_batch_wq)
     */
     requires std::same_as<std::atomic_uint, decltype(req_batch_wq.guard.size)>;
     
-    /* If not single-threaded, must acquire and release the consumer guard before and after calling, 
-    respectively
+    /* If not single-threaded, must acquire the consumer guard before calling; in this case, for sake of 
+    performance, the consumer guard should be freed within this function so that the old front pointer, 
+    if this queue is implemented as a linked list and is not null, can be deleted after freeing up the 
+    consumer guard to maximize performance without having to expose the node type and internal 
+    implementation to the rest of the application.
     */ 
     requires RequestBatchLike<std::remove_reference_t<decltype(
         *req_batch_wq.pop_front())>>;
