@@ -1091,7 +1091,10 @@ class LSMTree {
             level_infos[level].guard.atomic_guard.store(1);
         }
 
-        delete batch;
+        if (req_type != COMPACTION) {
+            delete batch;
+        }
+        
         if (!level) {
             batch = new RequestBatch(req_type);
         }
