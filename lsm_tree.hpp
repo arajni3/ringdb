@@ -303,7 +303,7 @@ class LSMTree {
     struct io_uring* scheduler_ring, ConnectionRequest* conn_req, CacheLocation location, 
     CacheBufferEntry* buffer_in_cache, unsigned int sstable_num, unsigned int level, 
     size_t left_boundary, char* null_key, char* tombstone_value, LevelInfo* 
-    level_infos, unsigned int index_in_level) {
+    level_infos, unsigned int index_in_level, unsigned int network_ringfd) {
         unsigned int cur_request;
         do {
             if (sstable_info->desired_sstable_offset >= sstable_info
@@ -394,13 +394,22 @@ class LSMTree {
             }
         } while (!(sstable_info->stack.empty() || sstable_info->waiting_on_io));
 
-        /* move requests to the next level if all were finished in the 
-        current sstable
-        */
-        if (sstable_info->stack.empty() && level < NUM_SSTABLE_LEVELS - 1) {
+        if (sstable_info->stack.empty()) {
             sstable_info->waiting_on_io = false;
-            this->insert_into_wqs(level + 1, level_infos, 
-            sstable_info->req_batch, sstable_info, index_in_level);
+
+            /* move requests to the next level if all were finished in the 
+            current sstable
+            */
+            if (level < NUM_SSTABLE_LEVELS - 1) {
+                this->insert_into_wqs(level + 1, level_infos, 
+                sstable_info->req_batch, sstable_info, index_in_level);
+            } else {
+                // otherwise, no more levels to go down to, so send back to network thread for completion
+                struct io_uring_sqe* sqe = io_uring_get_sqe(sstable_info->io_ring);
+                io_uring_prep_msg_ring(sqe, network_ringfd, 0, *(std::launder(reinterpret_cast<__u64*>(
+                &sstable_info->req_batch))), 0);
+                io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);  
+            }
         }
     }
 
@@ -736,7 +745,7 @@ class LSMTree {
                         this->try_sstable_tree_read_in_memory(sstable_info, 
                         scheduler_ring, conn_req, location, buffer_in_cache, 
                         sstable_num, level, left_boundary, null_key, tombstone_value, 
-                        level_infos, index_in_level);
+                        level_infos, index_in_level, network_ringfd);
                     }
             
                 }
@@ -768,11 +777,8 @@ class LSMTree {
                     my_zero = 0;
                     if (sstable_info->req_batch) {
                         if (sstable_info->req_batch->req_type == READ) {
-                            if (!sstable_info->req_batch->content.readwrite_pool
-                            .present_in_level) {
-                                this->insert_into_wqs(level + 1, level_infos, 
-                                sstable_info->req_batch, sstable_info, index_in_level);
-                            } else if (!sstable_info->is_flushed_to) {
+                            if (!(sstable_info->req_batch->content.readwrite_pool
+                            .present_in_level && sstable_info->is_flushed_to)) {
                                 if (level < NUM_SSTABLE_LEVELS - 1) {
                                     this->insert_into_wqs(level + 1, level_infos, 
                                     sstable_info->req_batch, sstable_info, 
@@ -801,7 +807,7 @@ class LSMTree {
                                 this->try_sstable_tree_read_in_memory(sstable_info, 
                                 scheduler_ring, conn_req, location, buffer_in_cache, 
                                 sstable_num, level, left_boundary, null_key, 
-                                tombstone_value, level_infos, index_in_level);
+                                tombstone_value, level_infos, index_in_level, network_ringfd);
                             }
 
                         } else if (sstable_info->is_flushed_to && 
@@ -1090,10 +1096,6 @@ class LSMTree {
         if (!level_infos[level].guard.is_single_thread) [[unlikely]] {
             level_infos[level].guard.atomic_guard.store(1);
             my_zero = 0;
-        }
-
-        if (req_type != COMPACTION) {
-            delete batch;
         }
 
         if (!level) {
