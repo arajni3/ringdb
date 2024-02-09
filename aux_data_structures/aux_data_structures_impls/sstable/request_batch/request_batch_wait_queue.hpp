@@ -38,7 +38,9 @@ class RequestBatchWaitQueue {
         thread does not operate on the otherwise-unsynchronized list nodes before the list nodes have 
         actually finished being modified
         */
-        guard.size.fetch_add(1);
+        if (!guard.is_single_thread) [[unlikely]] {
+            guard.size.fetch_add(1);
+        }
     }
 
     bool try_push_back(RequestBatch* req_batch, bool could_contend_with_consumer) {
