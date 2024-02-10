@@ -381,7 +381,7 @@ class LSMTree {
                         */
                         if (res)  {
                             sstable_info->desired_sstable_offset = index_in_buffer +
-                            location.sstable_offset_boundary[1];
+                            location.sstable_offset_boundary[0];
                         } else if (not_null) {
                             memcpy(conn_req->buffer + 5 + KEY_LENGTH, 
                             buffer_in_cache[index_in_buffer].value,
