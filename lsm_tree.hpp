@@ -338,7 +338,8 @@ class LSMTree {
                     if (sstable_info->cache_helper.free_buffers_left == 2) {
                         /* multiple of block size times 2 is a multiple of the block size
                         */
-                        left_boundary = left_boundary ? BLOCK_SIZE : left_boundary << 1;
+                        left_boundary = !left_boundary ? fair_aligned_sstable_page_cache_buffer_size 
+                        : left_boundary << 1;
                         sqe = io_uring_get_sqe(sstable_info->io_ring);
                         io_uring_prep_read(sqe, sstable_num, nullptr,
                         fair_aligned_sstable_page_cache_buffer_size, left_boundary);
