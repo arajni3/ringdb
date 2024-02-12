@@ -59,13 +59,35 @@ class RequestBatchWaitQueue {
             int size_var = guard.size.load();
             if (size_var > 1) [[likely]] {
                 back = back->next = new Node(req_batch);
+            /* if loaded size was 0, then the list is definitely empty and by the argument in the 
+            comment of the last conditional branch below, we can increment the size in a relaxed 
+            manner; otherwise, if the loaded size was 1, then the list is not empty, 
+            and the consumer below may be operating (it may have started after the consumer guard 
+            load above was done), so we need sequential consistency in this case
+            */
+            } else if (!size_var) [[unlikely]] {
+                if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
+                    return false;
+                }
+                front = back = new Node(req_batch);
+                guard.size.fetch_add(1, std::memory_order_relaxed);
             } else if (size_var == 1) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
                     return false;
                 }
-                standard_push_back(req_batch);
+                back = back->next = new Node(req_batch);
+                guard.size.fetch_add(1);
             } else [[unlikely]] {
+                /* if producer reaches this branch, then the sequentially consistent size load above 
+                occurred right after the consumer atomically fetch-and-subtracted the size below, so 
+                the list is definitely empty and we can (atomically) increment the size in a relaxed 
+                manner because having a smaller globally visible size will never cause simultaneous 
+                critical path access but at most cause threads to examine and possibly exit and 
+                reenter either the producer or consumer function since both the size load above and 
+                the consumer fetch-and-subtract below are done in a sequentially consistent manner
+                */
                 front = back = new Node(req_batch);
+                guard.size.fetch_add(1, std::memory_order_relaxed);
             }
         }
         return true;
@@ -84,15 +106,16 @@ class RequestBatchWaitQueue {
         producer, and in fact it must have sequential consistency because it guards the critical 
         path
         */
-        } else if (guard.size.load()) {
+        /* fetch_sub atomically subtracts from the atomic and returns the value previously held; if 
+        size ends up being negative, then we messed up, but it's not a big deal because the consumer 
+        shouldn't have anything to contend with the producer anyway, so we can add back the size 
+        in a relaxed manner outside of the critical path since the producer loads the size above 
+        in a sequentially consistent manner
+        */
+        } else if (guard.size.fetch_sub(1) - 1 >= 0) {
             RequestBatch* req_batch = front->req_batch;
             Node* node = front->next, node2 = front;
             front = node;
-            /* perform size change only after actually completing the queue modification so that 
-            producer thread does not operate on the otherwise-unsynchronized list nodes before the 
-            list nodes have actually finished being modified
-            */
-            guard.size.fetch_sub(1);
             /* delete old front node outside of entire critical path to minimize time spent waiting 
             to update size and free up consumer guard and thereby maximize performance without 
             exposing internal implementation to the rest of the application
@@ -100,6 +123,8 @@ class RequestBatchWaitQueue {
             guard.atomic_consumer_guard.store(1);
             delete node2;
             return req_batch;
+        } else [[unlikely]] {
+            guard.size.fetch_add(1, std::memory_order_relaxed);
         }
         return nullptr;
     }
