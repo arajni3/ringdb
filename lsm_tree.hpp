@@ -1235,7 +1235,8 @@ class LSMTree {
                 int num_given = 0;
                 int num_old_buffers_given = 0;
                 int num_new_buffers_given = 0;
-                int proportional_old_quantity, proportional_new_quantity, j;            
+                int proportional_old_quantity, proportional_new_quantity, j;   
+                unsigned int original_insert_from = sstable_info->insert_buffers_from;
                 BufferQueue* bq;
                 while (num_given < decomp.num_req_batches) {
                     /* Can use pure acquire-release semantics instead of sequential consistency to 
@@ -1254,27 +1255,24 @@ class LSMTree {
                         (bq->guard.is_single_thread || 
                         bq->guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
                         std::memory_order_acq_rel))) {
+                            given_buffers[i] = true;
+                            ++num_given;
                             if (bq->cur_num_buffers < max_sstable_height) {
-                                given_buffers[i] = true;
-                                ++num_given;
-
                                 proportional_old_quantity = proportions[i] * 
                                 old_buffer_limit;
                                 proportional_new_quantity = proportions[i] *
                                 num_new_buffers;
 
-                                auto original_insert_from = sstable_info->insert_buffers_from;
                                 for (j = 0; j < proportional_old_quantity && 
-                                num_old_buffers_given < old_buffer_limit; ++i) {
+                                num_old_buffers_given < old_buffer_limit && bq->cur_num_buffers 
+                                < max_sstable_height; ++j) {
                                     bq->push_back(sstable_info->page_cache_buffers[
                                         --sstable_info->insert_buffers_from]);
                                     ++num_old_buffers_given;
                                 };
-                                sstable_info->cache_helper.remove_buffer_range(
-                                    ++sstable_info->insert_buffers_from, original_insert_from
-                                );
                                 for (j = 0; j < proportional_new_quantity && 
-                                num_new_buffers_given < num_new_buffers; ++j) {
+                                num_new_buffers_given < num_new_buffers && 
+                                bq->cur_num_buffers < max_sstable_height; ++j) {
                                     bq->push_back(new_buffers[num_new_buffers_given++]);
                                 }
 
@@ -1296,6 +1294,10 @@ class LSMTree {
                             }
                         }
                     }
+                }
+                if (++sstable_info->insert_buffers_from < original_insert_from) {
+                    sstable_info->cache_helper.remove_buffer_range(sstable_info->insert_buffers_from, 
+                    original_insert_from);
                 }
                 /* remove transferred buffers from current sstable's buffer ring
                 */
