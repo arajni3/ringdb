@@ -1295,7 +1295,7 @@ class LSMTree {
                         }
                     }
                 }
-                if (++sstable_info->insert_buffers_from < original_insert_from) {
+                if (++sstable_info->insert_buffers_from <= original_insert_from) {
                     sstable_info->cache_helper.remove_buffer_range(sstable_info->insert_buffers_from, 
                     original_insert_from);
                 }
