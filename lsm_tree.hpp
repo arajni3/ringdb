@@ -690,6 +690,10 @@ class LSMTree {
         }
 
         while (true) {
+            /* this loop will almost certainly not be unrolled, in which case sequential consistency 
+            on atomic operations here will cause no penalty in performance compared to less strict 
+            memory orders
+            */
             for (i = first_sstable_num; i <= second_sstable_num; ++i) {
                 io_uring_peek_cqe(scheduler_ring, cqes);
                 if (cqes[0]) {
@@ -1181,11 +1185,17 @@ class LSMTree {
             for (unsigned int i = 0; i < LEVEL_FACTOR; ++i) {
                 wq = &(level_infos[level].sstable_infos[i].req_batch_wq);
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
-                wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1))) {
-                    /* Must use strong ordering for both CAS and following store so
-                    that the following wq push_back operations are always committed 
-                    to memory in the order of operations listed here, not out of
-                    order.
+                wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
+                std::memory_order_acq_rel))) {
+                    /* Can use pure acquire-release semantics instead of sequential consistency to 
+                    not stall the instruction pipeline for future producer trylocks in this loop 
+                    if this loop is unrolled by the compiler; since acquire semantics prevent 
+                    non-atomic and relaxed atomic operations listed after the acquire load 
+                    from being reordered before the acquire load and release semantics prevent 
+                    non-atomic and relaxed atomic operations listed before the release store 
+                    from being reordered after the release store, the critical section will still 
+                    be protected as long as the atomic size variable for the request batch wait 
+                    queue is always accessed using relaxed or sequentially consistent operations.
                     */
                     could_contend_with_consumer[i] = !wq->try_push_back(batches[i], 
                         could_contend_with_consumer[i]
@@ -1200,7 +1210,7 @@ class LSMTree {
                         inserted[i] = true;
                         
                         if (!wq->guard.is_single_thread) [[unlikely]] {
-                            wq->guard.atomic_producer_guard.store(1);
+                            wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
                             my_zero = 0;
                         }
                     }
@@ -1229,11 +1239,22 @@ class LSMTree {
                 int proportional_old_quantity, proportional_new_quantity, j;            
                 BufferQueue* bq;
                 while (num_given < decomp.num_req_batches) {
+                    /* Can use pure acquire-release semantics instead of sequential consistency to 
+                    not stall the instruction pipeline for future trylocks in this loop 
+                    if this loop is unrolled by the compiler; acquire semantics prevent 
+                    non-atomic and relaxed atomic operations listed after the acquire load 
+                    from being reordered before the acquire load and release semantics prevent 
+                    non-atomic and relaxed atomic operations listed before the release store 
+                    from being reordered after the release store, so the critical section will still 
+                    be protected since there are no other atomic variables involved in the buffer 
+                    queue operations
+                    */
                     for (int i = 0; i < LEVEL_FACTOR; ++i) {
                         bq = &(level_infos[level].buffer_queues[i]);
                         if (batches[i] && !given_buffers[i] && 
                         (bq->guard.is_single_thread || 
-                        bq->guard.atomic_guard.compare_exchange_weak(my_zero, 1))) {
+                        bq->guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
+                        std::memory_order_acq_rel))) {
                             if (bq->cur_num_buffers < max_sstable_height) {
                                 given_buffers[i] = true;
                                 ++num_given;
@@ -1266,12 +1287,12 @@ class LSMTree {
                                 }
 
                                 if (!bq->guard.is_single_thread) [[unlikely]] {
-                                    bq->guard.atomic_guard.store(1);
+                                    bq->guard.atomic_guard.store(1, std::memory_order_release);
                                     my_zero = 0;
                                 }
 
                             } else if (!bq->guard.is_single_thread) [[unlikely]] {
-                                bq->guard.atomic_guard.store(1);
+                                bq->guard.atomic_guard.store(1, std::memory_order_release);
                                 my_zero = 0;
                             }
                         }
