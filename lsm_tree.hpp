@@ -891,7 +891,7 @@ class LSMTree {
                             sstable_info->already_waited = false;
 
                             /* No new buffers, must transfer buffers upstream from 
-                            existing stock if any. No new buffers means 
+                            existing stock if possible. No new buffers means 
                             buffer_queue.num_new_buffers = 0 and hence 
                             buffer_queue.cur_num_buffers is precisely the number of old
                             (already registered in the current sstable) buffers. By 
