@@ -34,10 +34,12 @@ struct alignas(align<length>()) BufferQueue {
     void push_back(char* buffer) {
         this->back = (this->back + 1) % length;
         this->queue[this->back] = buffer;
+        ++cur_num_buffers;
         ++num_new_buffers;
     }
 
     char* pop_front() {
+        --cur_num_buffers;
         --num_new_buffers;
         char* front_buffer = this->queue[queue_front];
         this->queue_front = (this->queue_front + 1) % length;

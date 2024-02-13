@@ -766,8 +766,9 @@ class LSMTree {
                 prev_level = level - 1;
                 prev_index_in_level = prev_sstable_num - (prev_level 
                 * LEVEL_FACTOR);
+                buffer_queue = level_infos[level].buffer_queues + index_in_level;
                 prev_buffer_queue = level_infos[prev_level].buffer_queues 
-                + prev_sstable_num;
+                + prev_index_in_level;
 
                 if (!sstable_info->waiting_on_io) {
                     /* First check sstable wait queue for incoming read batches or 
@@ -915,17 +916,18 @@ class LSMTree {
                                         sstable_info->page_cache_buffers[
                                             --sstable_info->insert_buffers_from]);
                                 }
-                                /* remove entries from sparse buffer index by
-                                buffer id
-                                */
-
-                                sstable_info->cache_helper.remove_buffer_range(
-                                    ++sstable_info->insert_buffers_from, original_insert_from
-                                );
                                 if (!prev_buffer_queue->guard.is_single_thread) [[unlikely]] {
                                     prev_buffer_queue->guard.atomic_guard.store(1);
                                     my_zero = 0;    
                                 }   
+
+                                /* remove entries from sparse buffer index by
+                                buffer id
+                                */
+                                sstable_info->cache_helper.remove_buffer_range(
+                                    ++sstable_info->insert_buffers_from, original_insert_from
+                                );
+
                                 this->reregister_buffer_ring(sstable_info);   
                             }
                         }
