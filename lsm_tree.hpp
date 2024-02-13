@@ -1300,13 +1300,12 @@ class LSMTree {
                         }
                     }
                 }
-                if (++sstable_info->insert_buffers_from <= original_insert_from) {
-                    sstable_info->cache_helper.remove_buffer_range(sstable_info->insert_buffers_from, 
-                    original_insert_from);
-                }
-                /* remove transferred buffers from current sstable's buffer ring
+                /* remove transferred buffers from current sstable's buffer ring, updating the cache 
+                helper too
                 */
                 if (num_old_buffers_given) {
+                    sstable_info->cache_helper.remove_buffer_range(++sstable_info->insert_buffers_from, 
+                    original_insert_from);
                     this->reregister_buffer_ring(sstable_info);
                 }
             }
