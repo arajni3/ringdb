@@ -340,12 +340,15 @@ class LSMTree {
                         */
                         left_boundary = !left_boundary ? fair_aligned_sstable_page_cache_buffer_size 
                         : left_boundary << 1;
-                        sqe = io_uring_get_sqe(sstable_info->io_ring);
-                        io_uring_prep_read(sqe, sstable_num, nullptr,
-                        fair_aligned_sstable_page_cache_buffer_size, left_boundary);
-                        io_uring_sqe_set_data64(sqe, left_boundary);
-                        io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT
-                        | IOSQE_IO_LINK);
+                        // perform prefetch read only if it may contain data
+                        if (left_boundary < sstable_info->cache_helper.get_cur_min_invalid_offset()) {
+                            sqe = io_uring_get_sqe(sstable_info->io_ring);
+                            io_uring_prep_read(sqe, sstable_num, nullptr,
+                            fair_aligned_sstable_page_cache_buffer_size, left_boundary);
+                            io_uring_sqe_set_data64(sqe, left_boundary);
+                            io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT
+                            | IOSQE_IO_LINK);
+                        }
                     }
                     sqe = io_uring_get_sqe(sstable_info->io_ring);
                     io_uring_prep_msg_ring(sqe, scheduler_ring->ring_fd, 0, 
