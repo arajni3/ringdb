@@ -109,7 +109,7 @@ struct SSTableCacheHelper {
     }
 
     void remove_buffer_range(unsigned int buffer_id1, unsigned int buffer_id2) {
-        free_buffers_left -= buffer_id2 - buffer_id1;
+        free_buffers_left -= buffer_id2 - buffer_id1 + 1;
 
         if (buffer_id1 <= sparse_buffer_index.id_of_most_recently_selected_buffer) {
             unsigned int old_id_most_recently_selected = sparse_buffer_index.
