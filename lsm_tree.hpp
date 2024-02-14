@@ -7,7 +7,7 @@ be included before any include statement
 #include <algorithm>
 #include <thread>
 
-/* use for std::launder for pointer-number-pointer conversions object lifetimes
+/* use for std::launder for pointer-number-pointer conversions and object lifetimes
 */
 #include <new>
 
