@@ -1269,15 +1269,13 @@ class LSMTree {
                                 num_new_buffers;
 
                                 for (j = 0; j < proportional_old_quantity && 
-                                num_old_buffers_given < old_buffer_limit && bq->cur_num_buffers 
-                                < max_sstable_height; ++j) {
+                                num_old_buffers_given < old_buffer_limit; ++j) {
                                     bq->push_back(sstable_info->page_cache_buffers[
                                         --sstable_info->insert_buffers_from]);
                                     ++num_old_buffers_given;
                                 };
                                 for (j = 0; j < proportional_new_quantity && 
-                                num_new_buffers_given < num_new_buffers && 
-                                bq->cur_num_buffers < max_sstable_height; ++j) {
+                                num_new_buffers_given < num_new_buffers; ++j) {
                                     bq->push_back(new_buffers[num_new_buffers_given++]);
                                 }
 
