@@ -1034,28 +1034,31 @@ class LSMTree {
         latency overhead of strong CAS on nearly every context switch is not
         worth the possible extra gain in I/O speed by having extra buffers.
         */
+        /* We can use pure acquire-release semantics instead of sequential consistency to 
+        not block the store operation in io_uring_buf_ring_advance from executing (it is fine 
+        if it ends up executing before the trylock freeing release operation)
+        */
         if (buffer_queue.guard.is_single_thread || 
-        buffer_queue.guard.atomic_guard.compare_exchange_weak(my_zero, 1)) 
-            [[likely]] {
-                int new_num_added = 0;
-                char* new_buffer;
-                while (buffer_queue.front()) {
-                    ++new_num_added;
-                    new_buffer = buffer_queue.pop_front();
-                    sstable_info.page_cache_buffers[
-                    sstable_info.insert_buffers_from] = new_buffer;
-                    io_uring_buf_ring_add(sstable_info.buffer_ring, new_buffer,
+        buffer_queue.guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
+        std::memory_order_acq_rel)) [[likely]] {
+            int new_num_added = 0;
+            char* new_buffer;
+            while (buffer_queue.front()) {
+                ++new_num_added;
+                new_buffer = buffer_queue.pop_front();
+                sstable_info.page_cache_buffers[
+                sstable_info.insert_buffers_from] = new_buffer;
+                io_uring_buf_ring_add(sstable_info.buffer_ring, new_buffer,
                     fair_aligned_sstable_page_cache_buffer_size, 
                     sstable_info.insert_buffers_from, io_uring_buf_ring_mask(
                     max_buffer_ring_size), 
                     sstable_info.insert_buffers_from++);
                     sstable_info.cache_helper.add_buffer();
-                }
-                if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
-                    buffer_queue.guard.atomic_guard.store(1);
-                }
-                io_uring_buf_ring_advance(sstable_info.buffer_ring, 
-                new_num_added);
+            }
+            if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
+                buffer_queue.guard.atomic_guard.store(1, std::memory_order_release);
+            }
+            io_uring_buf_ring_advance(sstable_info.buffer_ring, new_num_added);
         }
     }
 
