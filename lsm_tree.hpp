@@ -1438,7 +1438,6 @@ class LSMTree {
                         io_uring_sqe_set_data64(sqe, 
                         *std::launder(reinterpret_cast<__u64*>(connection_pool->insert(
                             client_sock_fd, RECV))));
-                        sqe->buf_group = 0;
                         if (!(cqe->flags & IORING_CQE_F_MORE)) [[unlikely]] {
                             /* old multishot accept request is dead due to no
                             new connection requests coming in recently, so need to insert 
