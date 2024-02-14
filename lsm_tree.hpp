@@ -1081,8 +1081,8 @@ class LSMTree {
             io_uring_buf_ring_mask(reg.ring_entries), i
             );
         }
-        io_uring_buf_ring_advance(sstable_info->buffer_ring, 
-        sstable_info->insert_buffers_from);
+        io_uring_buf_ring_advance(sstable_info->buffer_ring, sstable_info->insert_buffers_from - 
+        (sstable_info->cache_helper.get_id_of_most_recently_selected_buffer() + 1));
     }
 
     /* Insert the RequestBatches of the
