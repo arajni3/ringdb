@@ -856,7 +856,7 @@ class LSMTree {
                         if (level > 0 && !buffer_queue->guard.is_single_thread && 
                         !buffer_queue->guard.atomic_guard.compare_exchange_weak(
                             my_zero, 1)) [[unlikely]] { 
-                        /* another thread is giving buffers; just wait until the next 
+                        /* another thread may be giving buffers; just wait until the next 
                         while loop iteration for the buffer queue to become available
                         */
                        } else if (level > 0 && buffer_queue->num_new_buffers) { 
