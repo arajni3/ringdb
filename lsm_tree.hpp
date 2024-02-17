@@ -1041,10 +1041,9 @@ class LSMTree {
         if (buffer_queue.guard.is_single_thread || 
         buffer_queue.guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
         std::memory_order_acq_rel)) [[likely]] {
-            int new_num_added = 0;
+            int new_num_added = buffer_queue.num_new_buffers;
             char* new_buffer;
             while (buffer_queue.front()) {
-                ++new_num_added;
                 new_buffer = buffer_queue.pop_front();
                 sstable_info.page_cache_buffers[
                 sstable_info.insert_buffers_from] = new_buffer;
