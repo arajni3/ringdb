@@ -772,8 +772,7 @@ class LSMTree {
 
                 if (!sstable_info->waiting_on_io) {
                     /* First check sstable wait queue for incoming read batches or 
-                    compactions. Should not have to contend for long since enqueuing is 
-                    simple and fast
+                    compactions
                     */
                     while (!sstable_info->req_batch_wq.guard.is_single_thread && 
                     !sstable_info->req_batch_wq.guard.atomic_consumer_guard.compare_exchange_weak(
