@@ -1191,17 +1191,8 @@ class LSMTree {
             for (unsigned int i = 0; i < LEVEL_FACTOR; ++i) {
                 wq = &(level_infos[level].sstable_infos[i].req_batch_wq);
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
-                wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1))) {
-                    /* We might as well use sequential consistency over pure acquire-release; 
-                    acquire semantics prevent non-atomic and relaxed atomic operations listed after 
-                    the acquire load from being reordered before the acquire load and release semantics
-                    prevent non-atomic and relaxed atomic operations listed before the release store 
-                    from being reordered after the release store, but the critical section can still 
-                    be protected only long as the atomic size variable for the request batch wait 
-                    queue is always accessed using relaxed or sequentially consistent operations. 
-                    The sequentially consistent operations on the size atomic will then prevent 
-                    future iterations of this loop from being processed out of order.
-                    */
+                wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
+                std::memory_order_acq_rel))) {
                     could_contend_with_consumer[i] = !wq->try_push_back(batches[i], 
                         could_contend_with_consumer[i]
                     );
@@ -1215,7 +1206,7 @@ class LSMTree {
                         inserted[i] = true;
                         
                         if (!wq->guard.is_single_thread) [[unlikely]] {
-                            wq->guard.atomic_producer_guard.store(1);
+                            wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
                             my_zero = 0;
                         }
                     }
