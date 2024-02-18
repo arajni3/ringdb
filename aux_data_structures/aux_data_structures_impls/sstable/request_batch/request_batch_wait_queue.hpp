@@ -111,8 +111,8 @@ class RequestBatchWaitQueue {
                 return req_batch;
             }
         /* atomic load here must have acquire semantics to be synchronized perfectly with the 
-        producer, and in fact it must have sequential consistency because it guards the critical 
-        path
+        producer; acquire semantics are sufficient in the consumer ogic itself because future 
+        atomic operations on other atomic variables happen in a dependent manner, not independently
         */
         /* fetch_sub atomically subtracts from the atomic and returns the value previously held; if 
         size ends up being negative, then we messed up, but it's not a big deal because the consumer 
