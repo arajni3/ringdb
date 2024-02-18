@@ -36,17 +36,19 @@ class RequestBatchWaitQueue {
         }
         /* perform size change only after actually completing the queue modification so that consumer 
         thread does not operate on the otherwise-unsynchronized list nodes before the list nodes have 
-        actually finished being modified
+        actually finished being modified; acquire-release semantics suffice because using acquire 
+        together with release on a read-modify-write enables global synchronization of loads and 
+        stores on all different variables
         */
         if (!guard.is_single_thread) [[unlikely]] {
-            guard.size.fetch_add(1);
+            guard.size.fetch_add(1, std::memory_order_acq_rel);
         }
     }
 
     bool try_push_back(RequestBatch* req_batch, bool could_contend_with_consumer) {
         /* all atomic loads here must have acquire semantics to be synchronized perfectly with the 
-        consumer, and in fact they must have sequential consistency because they all guard a critical 
-        path
+        consumer; acquire semantics are sufficient in the producer logic itself because future 
+        atomic operations on other atomic variables happen in a dependent manner, not independently
         */
         if (guard.is_single_thread) [[likely]] {
             standard_push_back(req_batch);
@@ -56,7 +58,7 @@ class RequestBatchWaitQueue {
             }
             standard_push_back(req_batch);
         } else [[likely]] {
-            int size_var = guard.size.load();
+            int size_var = guard.size.load(std::memory_order_acquire);
             if (size_var > 1) [[likely]] {
                 back = back->next = new Node(req_batch);
             /* if loaded size was 0, then the list is definitely empty and by the argument in the 
@@ -66,17 +68,23 @@ class RequestBatchWaitQueue {
             load above was done), so we need sequential consistency in this case
             */
             } else if (!size_var) [[unlikely]] {
-                if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
+                if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
                 }
                 front = back = new Node(req_batch);
                 guard.size.fetch_add(1, std::memory_order_relaxed);
             } else if (size_var == 1) [[unlikely]] {
-                if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
+                if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
                 }
                 back = back->next = new Node(req_batch);
-                guard.size.fetch_add(1);
+                /* acquire-release semantics are fine here because by definition of release semantics,
+                the store in this read-modify-write (hence the whole read-modify-write) 
+                will not happen before the pointer modification above, and by definition of acquire 
+                semantics, the load in this read-modify-write (hence the whole read-modify-write) will
+                not happen after the producer trylock is released
+                */
+                guard.size.fetch_add(1, std::memory_order_acq_rel);
             } else [[unlikely]] {
                 /* if producer reaches this branch, then the sequentially consistent size load above 
                 occurred right after the consumer atomically fetch-and-subtracted the size below, so 
@@ -84,7 +92,7 @@ class RequestBatchWaitQueue {
                 manner because having a smaller globally visible size will never cause simultaneous 
                 critical path access but at most cause threads to examine and possibly exit and 
                 reenter either the producer or consumer function since both the size load above and 
-                the consumer fetch-and-subtract below are done in a sequentially consistent manner
+                the consumer fetch-and-subtract below are done with acquire semantics
                 */
                 front = back = new Node(req_batch);
                 guard.size.fetch_add(1, std::memory_order_relaxed);
@@ -110,9 +118,9 @@ class RequestBatchWaitQueue {
         size ends up being negative, then we messed up, but it's not a big deal because the consumer 
         shouldn't have anything to contend with the producer anyway, so we can add back the size 
         in a relaxed manner outside of the critical path since the producer loads the size above 
-        in a sequentially consistent manner
+        with acquire semantics
         */
-        } else if (guard.size.fetch_sub(1) - 1 >= 0) {
+        } else if (guard.size.fetch_sub(1, std::memory_order_acq_rel) - 1 >= 0) {
             RequestBatch* req_batch = front->req_batch;
             Node* node = front->next, node2 = front;
             front = node;
@@ -120,7 +128,7 @@ class RequestBatchWaitQueue {
             to update size and free up consumer guard and thereby maximize performance without 
             exposing internal implementation to the rest of the application
             */
-            guard.atomic_consumer_guard.store(1);
+            guard.atomic_consumer_guard.store(1, std::memory_order_release);
             delete node2;
             return req_batch;
         } else [[unlikely]] {
