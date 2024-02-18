@@ -65,7 +65,7 @@ class RequestBatchWaitQueue {
             comment of the last conditional branch below, we can increment the size in a relaxed 
             manner; otherwise, if the loaded size was 1, then the list is not empty, 
             and the consumer below may be operating (it may have started after the consumer guard 
-            load above was done), so we need sequential consistency in this case
+            load above was done), so we need a stronger order (acquire-release) in this case
             */
             } else if (!size_var) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
