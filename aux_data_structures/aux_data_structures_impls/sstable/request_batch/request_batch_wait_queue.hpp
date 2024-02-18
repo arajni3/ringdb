@@ -53,7 +53,7 @@ class RequestBatchWaitQueue {
         if (guard.is_single_thread) [[likely]] {
             standard_push_back(req_batch);
         } else if (could_contend_with_consumer) [[unlikely]] {
-            if (!guard.atomic_consumer_guard.load()) [[unlikely]] {
+            if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                 return false;
             }
             standard_push_back(req_batch);
