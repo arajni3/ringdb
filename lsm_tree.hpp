@@ -1204,18 +1204,12 @@ class LSMTree {
                         }
                         ++num_queued;
                         inserted[i] = true;
-                        
-                        if (!wq->guard.is_single_thread) [[unlikely]] {
-                            wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
-                            my_zero = 0;
-                        }
                     }
-
-                    /* no point in producer thread releasing producer trylock for another producer 
-                    if it was contending with the consumer thread because then the other producer 
-                    may contend with the consumer too and waste more time than if the original 
-                    producer kept the trylock and (non-blockingly) waited for the producer to finish
-                    */
+                    
+                    if (!wq->guard.is_single_thread) [[unlikely]] {
+                        wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
+                        my_zero = 0;
+                    }
                 }
             }
         }
