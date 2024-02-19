@@ -61,6 +61,10 @@ class RequestBatchWaitQueue {
             int size_var = guard.size.load(std::memory_order_acquire);
             if (size_var > 1) [[likely]] {
                 back = back->next = new Node(req_batch);
+                /* since loaded size was >= 2, the next consumption cannot contend with the current 
+                producer, so we can use a relaxed ordering here
+                */
+                guard.size.fetch_add(1, std::memory_order_relaxed);
             /* if loaded size was 0, then the list is definitely empty and by the argument in the 
             comment of the last conditional branch below, we can increment the size in a relaxed 
             manner; otherwise, if the loaded size was 1, then the list is not empty, 
