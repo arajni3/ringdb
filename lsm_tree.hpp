@@ -1108,7 +1108,7 @@ class LSMTree {
         RequestType req_type = batch->req_type;
         Decomposition decomp = level_infos[level].decompose(batch);
         if (!level_infos[level].guard.is_single_thread) [[unlikely]] {
-            level_infos[level].guard.atomic_guard.store(1);
+            level_infos[level].guard.atomic_guard.store(1, std::memory_order_release);
             my_zero = 0;
         }
 
@@ -1186,7 +1186,7 @@ class LSMTree {
             io_uring_buf_ring_advance(sstable_info->buffer_ring, num_added_to_current);
 
             if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
-                buffer_queue.guard.atomic_guard.store(1);
+                buffer_queue.guard.atomic_guard.store(1, std::memory_order_release);
                 my_zero = 0;
             }
         }
