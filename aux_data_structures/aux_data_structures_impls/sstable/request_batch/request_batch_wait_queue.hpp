@@ -79,7 +79,7 @@ class RequestBatchWaitQueue {
                     return false;
                 } else {
                     front = back = new Node(req_batch);
-                    guard.size.fetch_add(1, std::memory_order_release);
+                    guard.size.fetch_add(1, std::memory_order_relaxed);
                 }
             } else if (size_var == 1) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
