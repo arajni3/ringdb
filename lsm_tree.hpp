@@ -1034,13 +1034,13 @@ class LSMTree {
         latency overhead of strong CAS on nearly every context switch is not
         worth the possible extra gain in I/O speed by having extra buffers.
         */
-        /* We can use pure acquire-release semantics instead of sequential consistency to 
-        not block the store operation in io_uring_buf_ring_advance from executing (it is fine 
-        if it ends up executing before the trylock freeing release operation)
+        /* We can use a relaxed ordering on the trylock CAS here because it's an explicit dependency
+        of the subsequent operations here, but the trylock freeup store must have release semantics 
+        to synchronize with the other instructions in this branch.
         */
         if (buffer_queue.guard.is_single_thread || 
         buffer_queue.guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
-        std::memory_order_acq_rel)) [[likely]] {
+        std::memory_order_relaxed)) [[likely]] {
             int new_num_added = buffer_queue.num_new_buffers;
             char* new_buffer;
             while (buffer_queue.front()) {
@@ -1193,7 +1193,7 @@ class LSMTree {
                 wq = &(level_infos[level].sstable_infos[i].req_batch_wq);
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
                 wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
-                std::memory_order_acq_rel))) {
+                std::memory_order_relaxed))) {
                     /* use this as an (unoptimizable) unidirectional instruction serializer
                     for atomic operations on different atomic variables in place of a memory fence 
                     as the only type of memory fence (sequential consistency, i.e., full memory 
@@ -1243,11 +1243,11 @@ class LSMTree {
                 unsigned int original_insert_from = sstable_info->insert_buffers_from;
                 BufferQueue* bq;
                 while (num_given < decomp.num_req_batches) {
-                    /* Can use pure acquire-release semantics instead of sequential consistency to 
+                    /* Can use relaxed-release semantics instead of sequential consistency to 
                     not stall the instruction pipeline for future trylocks in this loop 
-                    if this loop is unrolled by the compiler; acquire semantics prevent 
-                    non-atomic and relaxed atomic operations listed after the acquire load 
-                    from being reordered before the acquire load and release semantics prevent 
+                    if this loop is unrolled by the compiler; the CAS operation here is an explicit 
+                    dependency of subsequent instructions due to the branch structure and hence 
+                    can be done with a relaxed ordering, and release semantics prevent 
                     non-atomic and relaxed atomic operations listed before the release store 
                     from being reordered after the release store, so the critical section will still 
                     be protected since there are no other atomic variables involved in the buffer 
@@ -1258,7 +1258,7 @@ class LSMTree {
                         if (batches[i] && !given_buffers[i] && 
                         (bq->guard.is_single_thread || 
                         bq->guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
-                        std::memory_order_acq_rel))) {
+                        std::memory_order_release))) {
                             given_buffers[i] = true;
                             ++num_given;
                             if (bq->cur_num_buffers < max_sstable_height) {

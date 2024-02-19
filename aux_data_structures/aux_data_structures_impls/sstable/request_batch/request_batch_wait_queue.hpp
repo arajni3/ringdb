@@ -44,10 +44,6 @@ class RequestBatchWaitQueue {
     }
 
     bool try_push_back(RequestBatch* req_batch, bool could_contend_with_consumer) {
-        /* all atomic loads here must have acquire semantics to be synchronized perfectly with the 
-        consumer; acquire semantics are sufficient in the producer logic itself because future 
-        atomic operations on other atomic variables happen in a dependent manner, not independently
-        */
         if (guard.is_single_thread) [[likely]] {
             standard_push_back(req_batch);
         } else if (could_contend_with_consumer) [[unlikely]] {
@@ -57,7 +53,10 @@ class RequestBatchWaitQueue {
                 standard_push_back(req_batch);
             }
         } else [[likely]] {
-            int size_var = guard.size.load(std::memory_order_acquire);
+            /* because all instructions after the size load have a branch structure dependent on this 
+            size load, we can do the latter with a relaxed ordering
+            */
+            int size_var = guard.size.load(std::memory_order_relaxed);
             if (size_var > 1) [[likely]] {
                 back = back->next = new Node(req_batch);
                 /* since loaded size was >= 2, the next consumption cannot contend with the current 
@@ -78,14 +77,14 @@ class RequestBatchWaitQueue {
             semantics anyway
             */
             } else if (!size_var) [[unlikely]] {
-                if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
+                if (!guard.atomic_consumer_guard.load(std::memory_order_relaxed)) [[unlikely]] {
                     return false;
                 } else {
                     front = back = new Node(req_batch);
                     guard.size.fetch_add(1, std::memory_order_release);
                 }
             } else if (size_var == 1) [[unlikely]] {
-                if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
+                if (!guard.atomic_consumer_guard.load(std::memory_order_relaxed)) [[unlikely]] {
                     return false;
                 } else {
                     back->next = new Node(req_batch);
@@ -96,17 +95,18 @@ class RequestBatchWaitQueue {
                     guard.size.fetch_add(1, std::memory_order_release);
                 }
             } else [[unlikely]] {
-                /* if producer reaches this branch, then the sequentially consistent size load above 
-                occurred right after the consumer atomically fetch-and-subtracted the size below, so 
-                the list is definitely empty, but, to be perfectly safe, we must increment the size 
-                with release semantics so that the increment does not happen before the pointer
-                modification here is done so that the consumer does not detect a positive size before
-                the pointer modification is done; in actuality, though, the consumer thread will 
-                take a long time to come back to try consuming from the queue again because the 
-                sstable worker thread event loop is pretty long, and so using relaxed instead of 
-                release prevents having to issue an extra store fence instruction, which may slightly 
-                improve performance, though, to generalize this queue algorithm, we would want to 
-                use release semantics over relaxed
+                /* if producer reaches this branch, then the atomic size load above 
+                occurred right after the consumer atomically fetch-and-subtracted the size below but 
+                before the consumer released the consumer guard (because the latter operation 
+                is sequenced after the makeup increment in the consumer), so the list is definitely 
+                empty, but, to be perfectly safe, we must increment the size with release semantics 
+                so that the increment does not happen before the pointer modification here is done so 
+                that the consumer does not detect a positive size before the pointer modification is 
+                done; in actuality, though, the consumer thread will take a long time to come back to 
+                try consuming from the queue again because the sstable worker thread event loop is 
+                pretty long, and so using relaxed instead of release prevents having to issue an 
+                extra store fence instruction, which may slightly improve performance, though, to 
+                generalize this queue algorithm, we would want to use release semantics over relaxed
                 */
                 front = back = new Node(req_batch);
                 guard.size.fetch_add(1, std::memory_order_relaxed);
@@ -124,17 +124,17 @@ class RequestBatchWaitQueue {
                 front = node;
                 return req_batch;
             }
-        /* atomic load here must have acquire semantics to be synchronized perfectly with the 
-        producer; acquire semantics are sufficient in the consumer ogic itself because future 
-        atomic operations on other atomic variables happen in a dependent manner, not independently
+        /* atomic load here can be done with a relaxed memory order because of the dependent branch 
+        structure here
         */
         /* fetch_sub atomically subtracts from the atomic and returns the value previously held; if 
         size ends up being negative, then we messed up, but it's not a big deal because the consumer 
         shouldn't have anything to contend with the producer anyway, so we can add back the size 
-        in a relaxed manner outside of the critical path since the producer loads the size above 
-        with acquire semantics
+        in a relaxed manner outside of the critical path because the consumer will release the 
+        consumer guard with release semantics, which will synchronize with said relaxed makeup 
+        operation
         */
-        } else if (guard.size.fetch_sub(1, std::memory_order_acq_rel) - 1 >= 0) {
+        } else if (guard.size.fetch_sub(1, std::memory_order_relaxed) - 1 >= 0) {
             RequestBatch* req_batch = front->req_batch;
             Node* node = front->next, node2 = front;
             front = node;
