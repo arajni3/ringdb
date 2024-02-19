@@ -22,6 +22,7 @@
 #include <cmath>           /* pow, exp */
 #include <cstring>         /* strlen */
 #include <cstdlib>
+#include <algorithm>
 
 #include <gcem.hpp>
 
@@ -96,6 +97,7 @@ struct BloomFilter {
 
     BloomHashFunction hash_function;
     BloomFilter() {
+        std::fill(bloom, bloom + bloom_length, 0);
         bloom_filter_set_hash_function(this, nullptr);
     }
 };
