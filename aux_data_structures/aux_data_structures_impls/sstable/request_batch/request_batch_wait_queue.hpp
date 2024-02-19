@@ -101,7 +101,7 @@ class RequestBatchWaitQueue {
                 the pointer modification is done; in actuality, though, the consumer thread will 
                 take a long time to come back to try consuming from the queue again because the 
                 sstable worker thread event loop is pretty long, and so using relaxed instead of 
-                release prevents having to issue an extra store fence operation, which may slightly 
+                release prevents having to issue an extra store fence instruction, which may slightly 
                 improve performance, though, to generalize this queue algorithm, we would want to 
                 use release semantics over relaxed
                 */
