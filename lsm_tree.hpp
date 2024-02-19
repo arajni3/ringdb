@@ -1192,9 +1192,10 @@ class LSMTree {
         }
         while (num_queued < decomp.num_req_batches) {
             for (unsigned int i = 0; i < LEVEL_FACTOR; ++i) {
+                unsigned char local_zero = 0;
                 wq = &(level_infos[level].sstable_infos[i].req_batch_wq);
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
-                wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
+                wq->guard.atomic_producer_guard.compare_exchange_weak(local_zero, 1, 
                 std::memory_order_relaxed))) {
                     /* use this as an (unoptimizable) unidirectional instruction serializer
                     for atomic operations on different atomic variables in place of a memory fence 
@@ -1223,7 +1224,7 @@ class LSMTree {
 
                     if (done && !wq->guard.is_single_thread) [[unlikely]] {
                         wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
-                        my_zero = 0;
+                        local_zero = 0;
                     }
                 }
             }
@@ -1256,10 +1257,11 @@ class LSMTree {
                     queue operations
                     */
                     for (int i = 0; i < LEVEL_FACTOR; ++i) {
+                        unsigned char local_buffer_zero = 0;
                         bq = &(level_infos[level].buffer_queues[i]);
                         if (batches[i] && !given_buffers[i] && 
                         (bq->guard.is_single_thread || 
-                        bq->guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
+                        bq->guard.atomic_guard.compare_exchange_weak(local_buffer_zero, 1, 
                         std::memory_order_relaxed))) {
                             given_buffers[i] = true;
                             ++num_given;
@@ -1289,12 +1291,12 @@ class LSMTree {
 
                                 if (!bq->guard.is_single_thread) [[unlikely]] {
                                     bq->guard.atomic_guard.store(1, std::memory_order_release);
-                                    my_zero = 0;
+                                    local_buffer_zero = 0;
                                 }
 
                             } else if (!bq->guard.is_single_thread) [[unlikely]] {
                                 bq->guard.atomic_guard.store(1, std::memory_order_release);
-                                my_zero = 0;
+                                local_buffer_zero = 0;
                             }
                         }
                     }
