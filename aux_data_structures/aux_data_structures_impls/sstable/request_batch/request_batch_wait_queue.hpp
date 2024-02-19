@@ -55,8 +55,9 @@ class RequestBatchWaitQueue {
         } else if (could_contend_with_consumer) [[unlikely]] {
             if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                 return false;
+            } else {
+                standard_push_back(req_batch);
             }
-            standard_push_back(req_batch);
         } else [[likely]] {
             int size_var = guard.size.load(std::memory_order_acquire);
             if (size_var > 1) [[likely]] {
@@ -74,21 +75,23 @@ class RequestBatchWaitQueue {
             } else if (!size_var) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
+                } else {
+                    front = back = new Node(req_batch);
+                    guard.size.fetch_add(1, std::memory_order_relaxed);
                 }
-                front = back = new Node(req_batch);
-                guard.size.fetch_add(1, std::memory_order_relaxed);
             } else if (size_var == 1) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
+                } else {
+                    back->next = new Node(req_batch);
+                    /* acquire-release semantics are fine here because by definition of release 
+                    semantics, the store in this read-modify-write (hence the whole read-modify-write) 
+                    will not happen before the pointer modification above, and by definition of 
+                    acquire semantics, the load in this read-modify-write (hence the whole 
+                    read-modify-write) will not happen after the producer trylock is released
+                    */
+                    guard.size.fetch_add(1, std::memory_order_acq_rel);
                 }
-                back = back->next = new Node(req_batch);
-                /* acquire-release semantics are fine here because by definition of release semantics,
-                the store in this read-modify-write (hence the whole read-modify-write) 
-                will not happen before the pointer modification above, and by definition of acquire 
-                semantics, the load in this read-modify-write (hence the whole read-modify-write) will
-                not happen after the producer trylock is released
-                */
-                guard.size.fetch_add(1, std::memory_order_acq_rel);
             } else [[unlikely]] {
                 /* if producer reaches this branch, then the sequentially consistent size load above 
                 occurred right after the consumer atomically fetch-and-subtracted the size below, so 
