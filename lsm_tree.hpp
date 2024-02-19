@@ -1194,21 +1194,25 @@ class LSMTree {
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
                 wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
                 std::memory_order_acq_rel))) {
+                    volatile bool done = false;
                     could_contend_with_consumer[i] = !wq->try_push_back(batches[i], 
                         could_contend_with_consumer[i]
                     );
+                    done = true;
 
                     if (!could_contend_with_consumer[i]) { // successful
                         if (batches[LEVEL_FACTOR]) {
+                            done = false;
                             wq->standard_push_back(batches[LEVEL_FACTOR]);
                             batches[LEVEL_FACTOR] = nullptr;
+                            done = true;
                             ++num_queued;
                         }
                         ++num_queued;
                         inserted[i] = true;
                     }
 
-                    if (!wq->guard.is_single_thread) [[unlikely]] {
+                    if (done && !wq->guard.is_single_thread) [[unlikely]] {
                         wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
                         my_zero = 0;
                     }
