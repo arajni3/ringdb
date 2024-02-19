@@ -562,6 +562,7 @@ class LSMTree {
                                 */
                                 this->num_read.fetch_add(1, std::memory_order_relaxed);
                                 sstable_info->waiting_on_io = false;
+                                ++num_initialized_read;
                             } else if (j == 1) {
                                 this->schedule_initialization_read(sstable_info, 
                                 scheduler_ring, sstable_num, sqe);
