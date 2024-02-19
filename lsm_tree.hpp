@@ -852,11 +852,13 @@ class LSMTree {
                         */
                         sstable_info->already_waited = true;
                     } else {
-                        /* try to get access to the buffer queue in a lock-free manner
+                        /* try to get access to the buffer queue in a lock-free manner; use a 
+                        relaxed ordering to avoid unnecessary memory fence instructions while 
+                        relying on the branch structure for correctness
                         */
                         if (level > 0 && !buffer_queue->guard.is_single_thread && 
                         !buffer_queue->guard.atomic_guard.compare_exchange_weak(
-                            my_zero, 1)) [[unlikely]] { 
+                            my_zero, 1, std::memory_order_relaxed)) [[unlikely]] { 
                         /* another thread may be giving buffers; just wait until the next 
                         while loop iteration for the buffer queue to become available
                         */
@@ -1258,7 +1260,7 @@ class LSMTree {
                         if (batches[i] && !given_buffers[i] && 
                         (bq->guard.is_single_thread || 
                         bq->guard.atomic_guard.compare_exchange_weak(my_zero, 1, 
-                        std::memory_order_release))) {
+                        std::memory_order_relaxed))) {
                             given_buffers[i] = true;
                             ++num_given;
                             if (bq->cur_num_buffers < max_sstable_height) {
