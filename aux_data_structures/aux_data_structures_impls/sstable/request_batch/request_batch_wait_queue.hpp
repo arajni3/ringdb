@@ -68,18 +68,21 @@ class RequestBatchWaitQueue {
             the consumer guard with release semantics and so the consumer's relaxed size increment, 
             if issued, would have occurred before the consumer guard was released), and by the 
             argument in the comment of the last conditional branch below, we must increment the size 
-            with release semantics to be safe, or if we really want to stretch performance and rely 
-            on in-practice consumer timing for safety, then we can stick with a relaxed ordering; 
-            otherwise, if the loaded size was 1, then the list is not empty, and the consumer below 
-            may be operating (it may have started after the consumer guard load above was done), so 
-            we need release semantics anyway
+            with release semantics to be safe, but unlike below, where the probability that the 
+            consumer's relaxed makeup increment has not happened globally but that the consumer 
+            is about to enter the critical path is very small, the consumer's relaxed increment, if 
+            issued, would have already happened here, and there is a non-insignificant probability 
+            that the consumer is about to enter the critical path at this moment; otherwise, if the 
+            loaded size was 1, then the list is not empty, and the consumer below may be operating 
+            (it may have started after the consumer guard load above was done), so we need release 
+            semantics anyway
             */
             } else if (!size_var) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
                 } else {
                     front = back = new Node(req_batch);
-                    guard.size.fetch_add(1, std::memory_order_relaxed);
+                    guard.size.fetch_add(1, std::memory_order_release);
                 }
             } else if (size_var == 1) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
