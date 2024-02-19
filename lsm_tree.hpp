@@ -1224,7 +1224,6 @@ class LSMTree {
 
                     if (done && !wq->guard.is_single_thread) [[unlikely]] {
                         wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
-                        local_zero = 0;
                     }
                 }
             }
@@ -1291,12 +1290,10 @@ class LSMTree {
 
                                 if (!bq->guard.is_single_thread) [[unlikely]] {
                                     bq->guard.atomic_guard.store(1, std::memory_order_release);
-                                    local_buffer_zero = 0;
                                 }
 
                             } else if (!bq->guard.is_single_thread) [[unlikely]] {
                                 bq->guard.atomic_guard.store(1, std::memory_order_release);
-                                local_buffer_zero = 0;
                             }
                         }
                     }
