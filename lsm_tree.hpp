@@ -1194,7 +1194,12 @@ class LSMTree {
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
                 wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
                 std::memory_order_acq_rel))) {
+                    /* use this as an (unoptimizable) unidirectional instruction serializer (in 
+                    place of an actual memory fence) for atomic operations on different atomic 
+                    variables
+                    */
                     volatile bool done = false;
+
                     could_contend_with_consumer[i] = !wq->try_push_back(batches[i], 
                         could_contend_with_consumer[i]
                     );
