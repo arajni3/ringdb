@@ -47,6 +47,7 @@ struct LevelInfo {
             decomp.expected_sstable_sizes[i] = 0;
         }
         decomp.decomposition[LEVEL_FACTOR] = nullptr;
+        decomp.num_req_batches = 0;
         i = 0;
 
         if (req_batch->req_type == READ) {
@@ -97,6 +98,12 @@ struct LevelInfo {
                         conn_req->buffer, conn_req->client_sock_fd, conn_req->req_type);
                 }
             }
+            
+            for (i = 0; i <= LEVEL_FACTOR; ++i) {
+                if (decomp.decomposition[i]) {
+                    ++decomp.num_req_batches;
+                }
+            }
         } else { // compaction
             while (i < LEVEL_FACTOR && !filters[i++].empty());
             if (i < LEVEL_FACTOR) {
@@ -118,6 +125,7 @@ struct LevelInfo {
             }
             decomp.total_decomp_size = (1 << MEMTABLE_SIZE_MB_BITS) * (1 << 20);
             decomp.expected_sstable_sizes[i] = decomp.total_decomp_size;
+            decomp.num_req_batches = 1;
         }
 
         return decomp;

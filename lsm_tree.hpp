@@ -1201,11 +1201,12 @@ class LSMTree {
                         if (batches[LEVEL_FACTOR]) {
                             wq->standard_push_back(batches[LEVEL_FACTOR]);
                             batches[LEVEL_FACTOR] = nullptr;
+                            ++num_queued;
                         }
                         ++num_queued;
                         inserted[i] = true;
                     }
-                    
+
                     if (!wq->guard.is_single_thread) [[unlikely]] {
                         wq->guard.atomic_producer_guard.store(1, std::memory_order_release);
                         my_zero = 0;
