@@ -38,7 +38,8 @@ class RequestBatchWaitQueue {
         thread does not operate on the otherwise-unsynchronized list nodes before the list nodes have 
         actually finished being modified; acquire-release semantics suffice because using acquire 
         together with release on a read-modify-write enables global synchronization of loads and 
-        stores on all different variables
+        stores on all different variables except for the producer trylock release store, which 
+        must be serialized externally
         */
         if (!guard.is_single_thread) [[unlikely]] {
             guard.size.fetch_add(1, std::memory_order_acq_rel);
