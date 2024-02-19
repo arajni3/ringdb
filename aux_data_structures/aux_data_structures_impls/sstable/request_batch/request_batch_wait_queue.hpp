@@ -36,13 +36,10 @@ class RequestBatchWaitQueue {
         }
         /* perform size change only after actually completing the queue modification so that consumer 
         thread does not operate on the otherwise-unsynchronized list nodes before the list nodes have 
-        actually finished being modified; acquire-release semantics suffice because using acquire 
-        together with release on a read-modify-write enables global synchronization of loads and 
-        stores on all different variables except for the producer trylock release store, which 
-        must be serialized externally
+        actually finished being modified; release semantics suffice here
         */
         if (!guard.is_single_thread) [[unlikely]] {
-            guard.size.fetch_add(1, std::memory_order_acq_rel);
+            guard.size.fetch_add(1, std::memory_order_release);
         }
     }
 
@@ -70,39 +67,43 @@ class RequestBatchWaitQueue {
             /* if loaded size was 0, then the list is definitely empty (because the consumer releases 
             the consumer guard with release semantics and so the consumer's relaxed size increment, 
             if issued, would have occurred before the consumer guard was released), and by the 
-            argument in the comment of the last conditional branch below, we can increment the size 
-            in a relaxed manner; otherwise, if the loaded size was 1, then the list is not empty, 
-            and the consumer below may be operating (it may have started after the consumer guard 
-            load above was done), so we need a stronger order (acquire-release) in this case
+            argument in the comment of the last conditional branch below, we must increment the size 
+            with release semantics to be safe, or if we really want to stretch performance and rely 
+            on in-practice consumer timing for safety, then we can stick with a relaxed ordering; 
+            otherwise, if the loaded size was 1, then the list is not empty, and the consumer below 
+            may be operating (it may have started after the consumer guard load above was done), so 
+            we need release semantics anyway
             */
             } else if (!size_var) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
                 } else {
                     front = back = new Node(req_batch);
-                    guard.size.fetch_add(1, std::memory_order_relaxed);
+                    guard.size.fetch_add(1, std::memory_order_release);
                 }
             } else if (size_var == 1) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
                 } else {
                     back->next = new Node(req_batch);
-                    /* acquire-release semantics are fine here because by definition of release 
+                    /* release semantics are fine here because by definition of release 
                     semantics, the store in this read-modify-write (hence the whole read-modify-write) 
-                    will not happen before the pointer modification above, and by definition of 
-                    acquire semantics, the load in this read-modify-write (hence the whole 
-                    read-modify-write) will not happen after the producer trylock is released
+                    will not happen before the pointer modification above
                     */
-                    guard.size.fetch_add(1, std::memory_order_acq_rel);
+                    guard.size.fetch_add(1, std::memory_order_release);
                 }
             } else [[unlikely]] {
                 /* if producer reaches this branch, then the sequentially consistent size load above 
                 occurred right after the consumer atomically fetch-and-subtracted the size below, so 
-                the list is definitely empty and we can (atomically) increment the size in a relaxed 
-                manner because having a smaller globally visible size will never cause simultaneous 
-                critical path access but at most cause threads to examine and possibly exit and 
-                reenter either the producer or consumer function since both the size load above and 
-                the consumer fetch-and-subtract below are done with acquire semantics
+                the list is definitely empty, but, to be perfectly safe, we must increment the size 
+                with release semantics so that the increment does not happen before the pointer
+                modification here is done so that the consumer does not detect a positive size before
+                the pointer modification is done; in actuality, though, the consumer thread will 
+                take a long time to come back to try consuming from the queue again because the 
+                sstable worker thread event loop is pretty long, and so using relaxed instead of 
+                release prevents having to issue an extra store fence operation, which may slightly 
+                improve performance, though, to generalize this queue algorithm, we would want to 
+                use release semantics over relaxed
                 */
                 front = back = new Node(req_batch);
                 guard.size.fetch_add(1, std::memory_order_relaxed);
