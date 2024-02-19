@@ -67,17 +67,21 @@ class RequestBatchWaitQueue {
                 producer, so we can use a relaxed ordering here
                 */
                 guard.size.fetch_add(1, std::memory_order_relaxed);
-            /* if loaded size was 0, then the list is definitely empty and by the argument in the 
+            /* if loaded size was 0, then the list is possibly empty and by the argument in the 
             comment of the last conditional branch below, we can increment the size in a relaxed 
-            manner; otherwise, if the loaded size was 1, then the list is not empty, 
-            and the consumer below may be operating (it may have started after the consumer guard 
-            load above was done), so we need a stronger order (acquire-release) in this case
+            manner, but we need to check if the list is actually empty; otherwise, if the loaded 
+            size was 1, then the list is not empty, and the consumer below may be operating (it may 
+            have started after the consumer guard load above was done), so we need a stronger order 
+            (acquire-release) in this case
             */
             } else if (!size_var) [[unlikely]] {
                 if (!guard.atomic_consumer_guard.load(std::memory_order_acquire)) [[unlikely]] {
                     return false;
                 } else {
-                    front = back = new Node(req_batch);
+                    back = new Node(req_batch);
+                    if (!front) {
+                        front = back;
+                    }
                     guard.size.fetch_add(1, std::memory_order_relaxed);
                 }
             } else if (size_var == 1) [[unlikely]] {
