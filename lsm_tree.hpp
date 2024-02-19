@@ -1194,9 +1194,11 @@ class LSMTree {
                 if (batches[i] && !inserted[i] && (wq->guard.is_single_thread || 
                 wq->guard.atomic_producer_guard.compare_exchange_weak(my_zero, 1, 
                 std::memory_order_acq_rel))) {
-                    /* use this as an (unoptimizable) unidirectional instruction serializer (in 
-                    place of an actual memory fence) for atomic operations on different atomic 
-                    variables
+                    /* use this as an (unoptimizable) unidirectional instruction serializer
+                    for atomic operations on different atomic variables in place of a memory fence 
+                    as the only type of memory fence (sequential consistency, i.e., full memory 
+                    fence) that can do this does it bidirectionally and hence blocks future 
+                    unrollable loop iterations, which hurts performance
                     */
                     volatile bool done = false;
 
