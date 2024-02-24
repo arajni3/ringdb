@@ -14,7 +14,7 @@ concept RequestBatchWaitQueueLike = requires(RequestBatchWaitQueue req_batch_wq)
     requires std::same_as<std::atomic_uchar, decltype(req_batch_wq.guard.atomic_producer_guard)>;
     /* atomically records the size of the queue to indirectly synchronize the consumer and the 
     current producer so that the producer can tend to the end of the queue without being blocked 
-    by the consumer if it does not have to be (i.e., if the queue size is greater than 1); the small 
+    by the consumer if it does not have to be (e.g., if the queue size is greater than 1); the small 
     tradeoff is that, in case of contending with the consumer (which should be rare), an extra atomic 
     load operation, namely, of this size variable, will have been performed
     */
