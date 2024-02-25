@@ -39,6 +39,8 @@ concept SSTableCacheHelperLike = requires(
         >;
 
         requires std::same_as<unsigned int, decltype(sstable_cache_helper.free_buffers_left)>;
+        requires std::same_as<unsigned int, 
+        decltype(sstable_cache_helper.id_of_least_recently_selected_buffer)>;
 
         /* If this directly returns a constructor call, then RVO will apply. The
         left sstable boundary should be -1 if no buffer contains this offset.
@@ -58,8 +60,7 @@ concept SSTableCacheHelperLike = requires(
 
         {sstable_cache_helper.get_cur_min_invalid_offset()} -> std::same_as<std::size_t>;
 
-        /* use the id_of_most_recently_selected_buffer field of the sparse index 
-        to implement this method
+        /* use the id_of_most_recently_selected_buffer field to implement this method
         */
         {sstable_cache_helper.replenish_least_recently_selected_buffer()} 
         -> std::same_as<void>;
