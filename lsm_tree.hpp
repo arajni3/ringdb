@@ -139,8 +139,7 @@ class LSMTree {
             /* MAP_HUGETLB uses the default huge page size on the host platform, so 
             make sure to change that if applicable
             */
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED 
-            | (PAGE_SIZE > 4096) ? MAP_HUGETLB : 0,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED | MAP_HUGETLB
             -1, 
             0
         );
