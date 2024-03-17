@@ -13,7 +13,6 @@ struct SSTableInfoUnaligned {
     char file_path[file_path_length];
     bool is_flushed_to;
     unsigned int insert_buffers_from;
-    unsigned int buffer_ring_id;
     char* page_cache_buffers[max_num_buffers];
     char min_key[KEY_LENGTH];
     char max_key[KEY_LENGTH];

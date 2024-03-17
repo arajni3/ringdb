@@ -15,7 +15,6 @@ concept SSTableInfoLike = requires(SSTableInfo sstable_info) {
     requires std::same_as<char&, decltype(*(sstable_info.file_path))>;
     requires std::same_as<bool, decltype(sstable_info.is_flushed_to)>;
     requires std::same_as<unsigned int, decltype(sstable_info.insert_buffers_from)>;
-    requires std::same_as<unsigned int, decltype(sstable_info.buffer_ring_id)>;
     requires std::same_as<char*, std::remove_reference_t<
     decltype(*(sstable_info.page_cache_buffers))>>;
     requires std::same_as<char&, decltype(*(sstable_info.min_key))>;
