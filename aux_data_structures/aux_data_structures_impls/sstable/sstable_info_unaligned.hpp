@@ -18,7 +18,6 @@ struct SSTableInfoUnaligned {
     char min_key[KEY_LENGTH];
     char max_key[KEY_LENGTH];
     struct io_uring* io_ring;
-    struct io_uring_buf_ring* buffer_ring;
     SSTableCacheHelper cache_helper;
     Stack stack;
     RequestBatch* req_batch;

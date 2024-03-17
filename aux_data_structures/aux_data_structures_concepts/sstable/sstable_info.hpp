@@ -21,7 +21,6 @@ concept SSTableInfoLike = requires(SSTableInfo sstable_info) {
     requires std::same_as<char&, decltype(*(sstable_info.min_key))>;
     requires std::same_as<char&, decltype(*(sstable_info.max_key))>;
     requires std::same_as<io_uring&, decltype(*(sstable_info.io_ring))>;
-    requires std::same_as<io_uring_buf_ring&, decltype(*(sstable_info.buffer_ring))>;
     requires RequestBatchWaitQueueLike<std::remove_reference_t<
     decltype(sstable_info.req_batch_wq)>>;
     requires SSTableCacheHelperLike<std::remove_reference_t<

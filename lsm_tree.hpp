@@ -137,10 +137,9 @@ class LSMTree {
             fair_unaligned_sstable_page_cache_buffer_size * NUM_SSTABLES,
             PROT_READ | PROT_WRITE,
             /* MAP_HUGETLB uses the default huge page size on the host platform, so 
-            make sure to change that if applicable
+            make sure to change that needed
             */
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED 
-            | (PAGE_SIZE > 4096) ? MAP_HUGETLB : 0,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED | MAP_HUGETLB,
             -1, 
             0
         );
@@ -323,7 +322,6 @@ class LSMTree {
                 if (location.sstable_offset_boundary[0] == -1) {
                     // offset not found, must read from storage
                     if (!sstable_info->cache_helper.free_buffers_left) {
-                        io_uring_buf_ring_advance(sstable_info->buffer_ring, 1);
                         sstable_info->cache_helper
                         .replenish_least_recently_selected_buffer();
                     }
@@ -568,8 +566,6 @@ class LSMTree {
                                 scheduler_ring, sstable_num, sqe);
                             }
                         }
-                        io_uring_buf_ring_cq_advance(sstable_info->io_ring, 
-                        sstable_info->buffer_ring, 2);
                     } else { // file descriptor of sstable has been opened
                         this->fixed_file_fds[sstable_num] = static_cast<int>(cqes[0]
                         ->user_data);
@@ -634,14 +630,7 @@ class LSMTree {
                     io_uring_submit(sstable_info->io_ring);
                     sstable_info->desired_sstable_offset = 0;
 
-                    // initialize sstable buffer ring
-                    /* pointer to simulate a buffer ring in the application code itself
-                    because liburing does not currently provide a way to remove 
-                    buffers from a buffer ring without unregistering and reregistering 
-                    the whole ring; it does for regular provided buffers but that is 
-                    otherwise less efficient than a buffer ring
-                    */
-                    sstable_info->buffer_ring_id = sstable_num;
+                    // initialize sstable buffer set
                     sstable_info->insert_buffers_from = max_sstable_height;
                     for (m = 0; m < max_sstable_height; ++m) {
                         sstable_info->page_cache_buffers[m] = 
@@ -651,23 +640,9 @@ class LSMTree {
                     }
 
                     int error_val;
-                    /* enable transferring of other sstables' page cache buffer to this
-                    sstable to utilize page cache more actively and efficiently
-                    */
-                    sstable_info->buffer_ring = io_uring_setup_buf_ring(
-                    sstable_info->io_ring, max_buffer_ring_size, sstable_num,
-                    0, &error_val);
                     for (m = 0; i < max_sstable_height; ++m) {
-                        io_uring_buf_ring_add(sstable_info->buffer_ring, 
-                        sstable_info->page_cache_buffers[m], 
-                        fair_aligned_sstable_page_cache_buffer_size,
-                        m, 
-                        io_uring_buf_ring_mask(max_buffer_ring_size), 
-                        m);
                         sstable_info->cache_helper.add_buffer();
                     }  
-                    io_uring_buf_ring_advance(sstable_info->buffer_ring, 
-                    max_sstable_height);
                 }
             }
         }
@@ -745,8 +720,6 @@ class LSMTree {
                                 */
                                 sstable_info->cache_helper.
                                 set_cur_min_invalid_offset(left_boundary);
-                                io_uring_buf_ring_advance(
-                                    sstable_info->buffer_ring, 1);
                             }
                         }
                         io_uring_cq_advance(sstable_info->io_ring,
@@ -929,8 +902,6 @@ class LSMTree {
                                 sstable_info->cache_helper.remove_buffer_range(
                                     ++sstable_info->insert_buffers_from, original_insert_from
                                 );
-
-                                this->reregister_buffer_ring(sstable_info);   
                             }
                         }
                     }
@@ -1029,7 +1000,7 @@ class LSMTree {
         unsigned char my_zero = 0;
         /* Due to integer division rounding, the sstable will
         always have at least LEVEL_FACTOR - 1 buffers, so we can check the
-        buffer ring nonblockingly for new buffers instead of blockingly.
+        buffer queue nonblockingly for new buffers instead of blockingly.
         Use weak CAS (LL/SC) instead of strong even in non-blocking case 
         because there will generally be a large number of request batches 
         being processed concurrently by the LSM tree and so the guaranteed
@@ -1049,44 +1020,12 @@ class LSMTree {
                 new_buffer = buffer_queue.pop_front();
                 sstable_info.page_cache_buffers[
                 sstable_info.insert_buffers_from] = new_buffer;
-                io_uring_buf_ring_add(sstable_info.buffer_ring, new_buffer,
-                    fair_aligned_sstable_page_cache_buffer_size, 
-                    sstable_info.insert_buffers_from, io_uring_buf_ring_mask(
-                    max_buffer_ring_size), 
-                    sstable_info.insert_buffers_from++);
-                    sstable_info.cache_helper.add_buffer();
+                sstable_info.cache_helper.add_buffer();
             }
             if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
                 buffer_queue.guard.atomic_guard.store(1, std::memory_order_release);
             }
-            io_uring_buf_ring_advance(sstable_info.buffer_ring, new_num_added);
         }
-    }
-
-    inline void reregister_buffer_ring(SSTableInfo* sstable_info) {
-        /* only formally unregister buffer ring, do not free its underlying memory, which 
-        io_uring_free_buf_ring does
-        */
-        io_uring_unregister_buf_ring(sstable_info->io_ring, 
-        sstable_info->buffer_ring_id);
-        struct io_uring_buf_reg reg = { };
-        reg.ring_addr = (size_t)sstable_info->buffer_ring;
-        reg.ring_entries = max_buffer_ring_size;
-        reg.bgid = sstable_info->buffer_ring_id;
-        io_uring_register_buf_ring(sstable_info->io_ring, &reg, 0);
-        io_uring_buf_ring_init(sstable_info->buffer_ring);
-        int buffer_id;
-        // to prevent errors, do not add buffers that survived the transferring out
-        for (int i = sstable_info->cache_helper.get_id_of_most_recently_selected_buffer() + 1; 
-        i < sstable_info->insert_buffers_from; ++i) {
-            io_uring_buf_ring_add(sstable_info->buffer_ring, 
-            sstable_info->page_cache_buffers[i],
-            fair_aligned_sstable_page_cache_buffer_size, i,
-            io_uring_buf_ring_mask(reg.ring_entries), i
-            );
-        }
-        io_uring_buf_ring_advance(sstable_info->buffer_ring, sstable_info->insert_buffers_from - 
-        (sstable_info->cache_helper.get_id_of_most_recently_selected_buffer() + 1));
     }
 
     /* Insert the RequestBatches of the
@@ -1168,8 +1107,7 @@ class LSMTree {
                 new_buffers[num_new_buffers] = buffer_queue.pop_front();
             }
 
-            /* add remaining new buffers to current sstable's buffer ring
-            while it still has access
+            /* add remaining new buffers to current sstable while it still has access
             */
             int num_added_to_current = buffer_queue.num_new_buffers;
             while (buffer_queue.num_new_buffers) {
@@ -1177,13 +1115,8 @@ class LSMTree {
                 sstable_info->page_cache_buffers[sstable_info->insert_buffers_from] 
                 = new_buffer;
                 sstable_info->cache_helper.add_buffer();
-                io_uring_buf_ring_add(sstable_info->buffer_ring,
-                new_buffer, fair_aligned_sstable_page_cache_buffer_size,
-                sstable_info->insert_buffers_from, io_uring_buf_ring_mask(
-                    max_sstable_height* LEVEL_FACTOR), 
-                    sstable_info->insert_buffers_from++);
+                sstable_info->insert_buffers_from++);
             }
-            io_uring_buf_ring_advance(sstable_info->buffer_ring, num_added_to_current);
 
             if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
                 buffer_queue.guard.atomic_guard.store(1, std::memory_order_release);
@@ -1298,13 +1231,11 @@ class LSMTree {
                         }
                     }
                 }
-                /* remove transferred buffers from current sstable's buffer ring, updating the cache 
-                helper too
+                /* remove transferred buffers officially by updating the cache helper too
                 */
                 if (num_old_buffers_given) {
                     sstable_info->cache_helper.remove_buffer_range(++sstable_info->insert_buffers_from, 
                     original_insert_from);
-                    this->reregister_buffer_ring(sstable_info);
                 }
             }
     }
@@ -1370,10 +1301,9 @@ class LSMTree {
             MAX_SIMULTANEOUS_CONNECTIONS, 
             PROT_READ | PROT_WRITE,
             /* MAP_HUGETLB uses the default huge page size on the host platform, so 
-            make sure to change that if applicable
+            make sure to change that if needed
             */
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED 
-            | (PAGE_SIZE > 4096) ? MAP_HUGETLB : 0,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED | MAP_HUGETLB
             -1, 
             0
         );

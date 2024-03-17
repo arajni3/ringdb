@@ -9,7 +9,7 @@
 template<unsigned int alignment>
 consteval unsigned int sstable_align() {
     unsigned int res = std::lcm(alignment, ALIGN_NO_FALSE_SHARING), power = 1;
-    while (power < 1) {
+    while (power < res) {
         power <<= 1;
     }
     return power;
@@ -29,7 +29,6 @@ struct alignas(sstable_align<alignment>()) SSTableInfo {
     char min_key[KEY_LENGTH];
     char max_key[KEY_LENGTH];
     struct io_uring* io_ring;
-    struct io_uring_buf_ring* buffer_ring;
     SSTableCacheHelper cache_helper;
     Stack stack;
     RequestBatch* req_batch;
