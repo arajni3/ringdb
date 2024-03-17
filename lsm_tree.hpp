@@ -636,12 +636,9 @@ class LSMTree {
                         sstable_page_cache_buffers + 
                         fair_aligned_sstable_page_cache_buffer_size * (
                         sstable_num + m);
-                    }
-
-                    int error_val;
-                    for (m = 0; i < max_sstable_height; ++m) {
                         sstable_info->cache_helper.add_buffer();
-                    }  
+
+                    } 
                 }
             }
         }
