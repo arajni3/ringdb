@@ -24,7 +24,6 @@ struct alignas(sstable_align<alignment>()) SSTableInfo {
     char file_path[file_path_length];
     bool is_flushed_to = false;
     unsigned int insert_buffers_from = 0;
-    unsigned int buffer_ring_id;
     char* page_cache_buffers[max_num_buffers];
     char min_key[KEY_LENGTH];
     char max_key[KEY_LENGTH];

@@ -1,6 +1,6 @@
 #pragma once
 #include <cstddef>
-#include "bloom_filter.hpp"
+#include "bloom_filter/bloom_filter.hpp"
 
 template<unsigned int num_elements>
 class Filter {

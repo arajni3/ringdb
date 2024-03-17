@@ -38,17 +38,17 @@ int main(int, char**){
     typedef ConnectionPool<ConnReq> ConnPool;
     typedef RequestBatchWaitQueue<ReqBatch> ReqBatchWaitQueue;
 
-    typedef SparseBufferIndex<CacheLocation, max_buffer_ring_size> SparseBufferIndexType;
+    typedef SparseBufferIndex<CacheLocation, max_buffer_set_size> SparseBufferIndexType;
     typedef SSTableCacheHelper<SparseBufferIndexType, CacheLocation> SSTableCacheHelperType;
     
     typedef SSTableInfoUnaligned<ReqBatch, ReqBatchWaitQueue, SSTableCacheHelperType, StackType, 
-    8 + level_str_len + 1 + sstable_number_str_len, max_buffer_ring_size> SSTableInfoUnalignedType;
+    8 + level_str_len + 1 + sstable_number_str_len, max_buffer_set_size> SSTableInfoUnalignedType;
     typedef SSTableInfo<ReqBatch, ReqBatchWaitQueue, SSTableCacheHelperType, StackType, 
-    8 + level_str_len + 1 + sstable_number_str_len, max_buffer_ring_size, 
+    8 + level_str_len + 1 + sstable_number_str_len, max_buffer_set_size, 
     alignof(SSTableInfoUnalignedType)> SSTableInfoType;
 
     typedef Filter<static_cast<unsigned int>(MEMTABLE_SIZE / (KEY_LENGTH + VALUE_LENGTH))> FilterType;
-    typedef BufferQueue<max_buffer_ring_size, max_sstable_height> BufferQueueType;
+    typedef BufferQueue<max_buffer_set_size, max_sstable_height> BufferQueueType;
     typedef Decomposition<ReqBatch> DecompositionType;
     typedef SparseIndex<KEY_LENGTH + (KEY_LENGTH << 1) * LEVEL_FACTOR> SparseIndexType;
     typedef LevelInfo<FilterType, BufferQueueType, SparseIndexType, SSTableInfoType, 

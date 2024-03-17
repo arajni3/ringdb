@@ -43,7 +43,7 @@ static inline const constinit unsigned int max_sstable_height = MEMTABLE_SIZE_MB
 static inline const constinit unsigned int stack_depth = my_log2_ceil<
 static_cast<double>((1 << MEMTABLE_SIZE_MB_BITS) * (1 << 20) / (KEY_LENGTH + VALUE_LENGTH))>();
 
-static inline const constinit unsigned int max_buffer_ring_size = max_sstable_height * 
+static inline const constinit unsigned int max_buffer_set_size = max_sstable_height * 
 LEVEL_FACTOR;
 
 /* the ceiling of the log (base 10) of of 2**32 is 10, and unsigned integers are tightly bounded 
