@@ -15,8 +15,8 @@ struct SSTableCacheHelper {
         */
         sparse_buffer_index.cur_min_invalid_offset = -1;
         
-        sparse_buffer_index.id_of_most_recently_selected_buffer = 0;
-        id_of_least_recently_selected_buffer = 0;
+        sparse_buffer_index.id_of_most_recently_selected_buffer = -1;
+        id_of_least_recently_selected_buffer = -1;
     }
 
     void set_cur_min_invalid_offset(std::size_t invalid_sstable_offset) {
