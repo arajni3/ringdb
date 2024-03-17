@@ -132,17 +132,6 @@ class LSMTree {
         #else
         this->sstable_dir_fd = open("/sstab1e", O_CREAT, mode);
         #endif
-        this->sstable_page_cache_buffers = (char*)mmap(
-            nullptr,
-            fair_unaligned_sstable_page_cache_buffer_size * NUM_SSTABLES,
-            PROT_READ | PROT_WRITE,
-            /* MAP_HUGETLB uses the default huge page size on the host platform, so 
-            make sure to change that if needed
-            */
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
-            -1, 
-            0
-        );
 
         this->level_infos = new LevelInfo[NUM_SSTABLE_LEVELS];
         mlock(this->level_infos, sizeof(LevelInfo) * LEVEL_FACTOR);
@@ -435,6 +424,18 @@ class LSMTree {
             &sstable_worker_thread_cpu
         );
 
+        char* sstable_page_cache_buffers = (char*)mmap(
+            nullptr,
+            fair_aligned_sstable_page_cache_buffer_size * max_sstable_height,
+            PROT_READ | PROT_WRITE,
+            /* MAP_HUGETLB uses the default huge page size on the host platform, so 
+            make sure to change that if needed
+            */
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
+            -1, 
+            0
+        );
+
         /* Initialize scheduler ring. We will use the io_uring_prep_msg_ring function 
         along with IOSQE_IO_LINK to link each asynchronous I/O batch operation of an 
         sstable in the worker thread's batch to a message in the worker thread's io 
@@ -632,8 +633,8 @@ class LSMTree {
                     sstable_info->insert_buffers_from = max_sstable_height;
                     for (m = 0; m < max_sstable_height; ++m) {
                         sstable_info->page_cache_buffers[m] = 
-                        this->sstable_page_cache_buffers + 
-                        fair_unaligned_sstable_page_cache_buffer_size * (
+                        sstable_page_cache_buffers + 
+                        fair_aligned_sstable_page_cache_buffer_size * (
                         sstable_num + m);
                     }
 
@@ -1545,6 +1546,4 @@ class LSMTree {
     struct io_uring* main_thread_comm_ring;
 
     std::atomic_uint num_read{0};
-
-    char* sstable_page_cache_buffers; 
 };

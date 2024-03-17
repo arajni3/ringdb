@@ -64,18 +64,6 @@ static inline const constinit unsigned int fair_aligned_sstable_page_cache_buffe
 std::lcm(std::lcm(static_cast<unsigned int>(fair_sstable_page_cache_size 
 / max_sstable_height), KEY_LENGTH + VALUE_LENGTH), BLOCK_SIZE);
 
-/* will be a multiple of the block size since the fair aligned sstable
-page cache buffer size will be a multiple of the block size, and will also
-avoid false sharing since it will pad at least a positive multiple of the
-minimum no-false-sharing size to the fair aligned sstable page cache buffer
-size (the actual buffer size used for I/O will be the latter buffer size)
-*/
-static inline const constinit unsigned int fair_unaligned_sstable_page_cache_buffer_size = 
-fair_aligned_sstable_page_cache_buffer_size + std::lcm(
-    BLOCK_SIZE,
-    ALIGN_NO_FALSE_SHARING
-);
-
 /* Everything including this program should be root-owned, which should already 
 be able to read and write to anything. When an sstable file is first created, 
 it will be owned by the user who created it, which will be root, so this mode 
