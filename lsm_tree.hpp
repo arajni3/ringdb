@@ -1357,12 +1357,12 @@ class LSMTree {
                 if (req_type == ACCEPT) {
                     if (client_sock_fd > 0) [[likely]] {
                         // prepare recv request
+                        conn_req = connection_pool->insert(client_sock_fd, RECV);
                         io_uring_prep_recv(sqe, client_sock_fd, conn_req->buffer, 
                         SOCKET_BUFFER_LENGTH, 0);
                         io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                         io_uring_sqe_set_data64(sqe, 
-                        *std::launder(reinterpret_cast<__u64*>(connection_pool->insert(
-                            client_sock_fd, RECV))));
+                        *std::launder(reinterpret_cast<__u64*>(conn_req)));
                         if (!(cqe->flags & IORING_CQE_F_MORE)) [[unlikely]] {
                             /* old multishot accept request is dead due to no
                             new connection requests coming in recently, so need to insert 
