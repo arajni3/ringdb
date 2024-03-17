@@ -426,7 +426,7 @@ class LSMTree {
 
         char* sstable_page_cache_buffers = (char*)mmap(
             nullptr,
-            fair_aligned_sstable_page_cache_buffer_size * max_sstable_height,
+            fair_aligned_sstable_page_cache_buffer_size * max_sstable_height * WORKER_SSTABLE_BATCH_SIZE,
             PROT_READ | PROT_WRITE,
             /* MAP_HUGETLB uses the default huge page size on the host platform, so 
             make sure to change that if needed
