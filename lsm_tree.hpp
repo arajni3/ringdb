@@ -238,19 +238,17 @@ class LSMTree {
     inline void schedule_initialization_read(SSTableInfo* sstable_info, 
     struct io_uring* scheduler_ring, unsigned int sstable_num, struct io_uring_sqe* sqe) {
         sqe = io_uring_get_sqe(sstable_info->io_ring);
-        io_uring_prep_read(sqe, sstable_num, nullptr, 
+        io_uring_prep_read(sqe, sstable_num, sstable_info->page_cache_buffers[0], 
         fair_aligned_sstable_page_cache_buffer_size, 
         sstable_info->desired_sstable_offset);
-        io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT | 
-        IOSQE_IO_LINK);
+        io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_IO_LINK);
 
         sqe = io_uring_get_sqe(sstable_info->io_ring);
-        io_uring_prep_read(sqe, sstable_num, nullptr, 
+        io_uring_prep_read(sqe, sstable_num, sstable_info->page_cache_buffers[1], 
         fair_aligned_sstable_page_cache_buffer_size, 
         sstable_info->desired_sstable_offset + 
         fair_aligned_sstable_page_cache_buffer_size);
-        io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT |
-        IOSQE_IO_LINK);
+        io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_IO_LINK);
 
         sqe = io_uring_get_sqe(sstable_info->io_ring);
         io_uring_prep_msg_ring(sqe, scheduler_ring->ring_fd, 
@@ -328,11 +326,12 @@ class LSMTree {
                     struct io_uring_sqe* sqe = io_uring_get_sqe(sstable_info->io_ring);
                     left_boundary = this->round_to_block_size_multiple(
                         sstable_info->desired_sstable_offset);
-                    io_uring_prep_read(sqe, sstable_num, nullptr,
+                    auto first_buffer_ptr = sstable_info->page_cache_buffers + 
+                        (sstable_info->cache_helper.get_id_of_most_recently_selected_buffer() + 1);
+                    io_uring_prep_read(sqe, sstable_num, *first_buffer_ptr,
                     fair_aligned_sstable_page_cache_buffer_size, left_boundary);
                     io_uring_sqe_set_data64(sqe, left_boundary);
-                    io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT | 
-                    IOSQE_IO_LINK);
+                    io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_IO_LINK);
                     if (sstable_info->cache_helper.free_buffers_left == 2) {
                         /* multiple of block size times 2 is a multiple of the block size
                         */
@@ -341,11 +340,10 @@ class LSMTree {
                         // perform prefetch read only if it may contain data
                         if (left_boundary < sstable_info->cache_helper.get_cur_min_invalid_offset()) {
                             sqe = io_uring_get_sqe(sstable_info->io_ring);
-                            io_uring_prep_read(sqe, sstable_num, nullptr,
+                            io_uring_prep_read(sqe, sstable_num, *(first_buffer_ptr + 1),
                             fair_aligned_sstable_page_cache_buffer_size, left_boundary);
                             io_uring_sqe_set_data64(sqe, left_boundary);
-                            io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT
-                            | IOSQE_IO_LINK);
+                            io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE | IOSQE_IO_LINK);
                         }
                     }
                     sqe = io_uring_get_sqe(sstable_info->io_ring);
