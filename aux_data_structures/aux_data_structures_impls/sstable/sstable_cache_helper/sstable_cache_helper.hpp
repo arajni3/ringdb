@@ -129,8 +129,8 @@ struct SSTableCacheHelper {
             }
             // all the cached data has been transferred out due to buffer transfers
             if (id_of_least_recently_selected_buffer > buffer_id1) [[unlikely]] {
-                id_of_least_recently_selected_buffer = 0;
-                sparse_buffer_index.id_of_most_recently_selected_buffer = 0;
+                id_of_least_recently_selected_buffer = -1;
+                sparse_buffer_index.id_of_most_recently_selected_buffer = -1;
             }
         }
     }
