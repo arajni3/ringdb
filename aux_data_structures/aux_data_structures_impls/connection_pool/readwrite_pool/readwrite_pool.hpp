@@ -12,7 +12,7 @@ struct ReadWritePool {
     // guaranteed to succeed
     void insert_read_write(char* buffer, int client_sock_fd, 
     RequestType req_type, void* req_batch_ref) {
-        if (!this->length) { [[unlikely]]
+        if (!this->length) [[unlikely]] {
             this->data = new ConnectionRequest[PAGE_SIZE];
         }
         unsigned int left = 0, right = this->length, mid;

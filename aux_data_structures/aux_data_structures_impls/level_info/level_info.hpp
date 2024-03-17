@@ -74,7 +74,7 @@ struct LevelInfo {
                         conn_req->client_sock_fd, conn_req->req_type);
                         ++decomp.expected_sstable_sizes[i];
                     } else { // definitely not in this sstable hence in any sstable
-                        if (!decomp.decomposition[LEVEL_FACTOR]) { [[unlikely]]
+                        if (!decomp.decomposition[LEVEL_FACTOR]) [[unlikely]] {
                             decomp.decomposition[LEVEL_FACTOR] = new RequestBatch(READ);
                             decomp.decomposition[i]->content.readwrite_pool.present_in_level = 
                             false;
@@ -90,7 +90,7 @@ struct LevelInfo {
             for (i = 0; i < rw_pool.length; ++i) {
                 conn_req = rw_pool.data + i;
                 if (conn_req->client_sock_fd != -1) { // not contained in an sstable range
-                    if (!decomp.decomposition[LEVEL_FACTOR]) { [[unlikely]]
+                    if (!decomp.decomposition[LEVEL_FACTOR]) [[unlikely]] {
                         decomp.decomposition[LEVEL_FACTOR] = new RequestBatch(READ);
                         decomp.decomposition[i]->content.readwrite_pool.present_in_level = false;
                     }
