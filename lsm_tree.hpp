@@ -137,9 +137,9 @@ class LSMTree {
             fair_unaligned_sstable_page_cache_buffer_size * NUM_SSTABLES,
             PROT_READ | PROT_WRITE,
             /* MAP_HUGETLB uses the default huge page size on the host platform, so 
-            make sure to change that needed
+            make sure to change that if needed
             */
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED | MAP_HUGETLB,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
             -1, 
             0
         );
@@ -1112,10 +1112,9 @@ class LSMTree {
             int num_added_to_current = buffer_queue.num_new_buffers;
             while (buffer_queue.num_new_buffers) {
                 char* new_buffer = buffer_queue.pop_front();
-                sstable_info->page_cache_buffers[sstable_info->insert_buffers_from] 
+                sstable_info->page_cache_buffers[sstable_info->insert_buffers_from++] 
                 = new_buffer;
                 sstable_info->cache_helper.add_buffer();
-                sstable_info->insert_buffers_from++);
             }
 
             if (!buffer_queue.guard.is_single_thread) [[unlikely]] {
@@ -1303,7 +1302,7 @@ class LSMTree {
             /* MAP_HUGETLB uses the default huge page size on the host platform, so 
             make sure to change that if needed
             */
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED | MAP_HUGETLB
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB
             -1, 
             0
         );
