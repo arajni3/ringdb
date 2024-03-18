@@ -514,8 +514,7 @@ class LSMTree {
                                 sstable_info->is_flushed_to = true;
                                 num_entries = cqes[j]->res / sizeof(CacheBufferEntry);
                                 buffer_in_cache = std::launder(reinterpret_cast<CacheBufferEntry*>
-                                (sstable_info->page_cache_buffers[
-                                    cqes[j]->flags >> IORING_CQE_BUFFER_SHIFT]));
+                                (sstable_info->page_cache_buffers[j]));
                                 for (k = 0; k < num_entries; ++k) {
                                     if (std::memcmp(buffer_in_cache[i].value, tombstone_value, 
                                     VALUE_LENGTH)) {
@@ -687,8 +686,7 @@ class LSMTree {
                         this->is_practically_full = level == NUM_SSTABLE_LEVELS - 1;
                     } else {
                         for (j = 0; j < num_chunks_queued; ++j) {
-                            unsigned int buffer_id = cqes[j]->flags 
-                            >> IORING_CQE_BUFFER_SHIFT;
+                            unsigned int buffer_id = sstable_info->cache_helper.get_id_of_most_recently_selected_buffer() + 1 + j;
                             left_boundary = static_cast<size_t>(
                                 io_uring_cqe_get_data64(cqes[j]));
                             size_t right_boundary = left_boundary + cqes[j]->res;
@@ -708,10 +706,7 @@ class LSMTree {
                                     set_cur_min_invalid_offset(right_boundary + 1);
                                 }
                             } else {
-                                /* if no bytes read, tell io_uring to free up the buffer
-                                (it is the most recently used by io_uring
-                                hence will be the one removed by the
-                                following advance call) and mark the
+                                /* if no bytes read, mark the
                                 beginning offset as invalid
                                 */
                                 sstable_info->cache_helper.
